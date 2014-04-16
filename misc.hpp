@@ -211,7 +211,76 @@ namespace misc
 					)
 				);
 	}//GCC Workaround
-
+	auto dleft_to_right( std::array< std::array< square, 4 >, 4 > & data )
+	{
+		std::vector< std::pair< decltype( data[0].begin( ) ), decltype( data[0].begin( ) ) > > ret;
+		std::transform(
+					data.begin( ),
+					data.end( ),
+					std::back_inserter( ret ),
+					[]( decltype( data[0] ) data ){ return std::make_pair( data.begin( ), data.end( ) ); } );
+		return ret;
+	}
+	auto dright_to_left( std::array< std::array< square, 4 >, 4 > & data )
+	{
+		std::vector< std::pair< decltype( data[0].rbegin( ) ), decltype( data[0].rbegin( ) ) > > ret;
+		std::transform(
+					data.begin( ),
+					data.end( ),
+					std::back_inserter( ret ),
+					[]( decltype( data[0] ) data ){ return std::make_pair( data.rbegin( ), data.rend( ) ); } );
+		return ret;
+	}
+	auto dup_to_down( std::array< std::array< square, 4 >, 4 > & data )
+	{
+		typedef skipping_iterator< decltype( srange( data ).begin( ) ), 4 > tem;
+		std::vector< tem > after_split;
+		auto
+				p_end =
+				split
+					<
+						decltype( srange( data ).begin( ) ),
+						decltype( std::back_inserter( after_split ) ),
+						4
+					>
+					(
+						srange( data ).begin( ),
+						srange( data ).end( ),
+						std::back_inserter( after_split )
+					);
+		std::vector< std::pair< tem, tem > > ret;
+		std::transform(
+					after_split.begin( ),
+					after_split.end( ),
+					std::back_inserter( ret ),
+					[&]( decltype( * after_split.begin( ) ) b ){ return std::make_pair( b, p_end ); } );
+		return ret;
+	}
+	auto ddown_to_up( std::array< std::array< square, 4 >, 4 > & data )
+	{
+		typedef skipping_iterator< decltype( boost::rbegin( srange( data ) ) ), 4 > tem;
+		std::vector< tem > after_split;
+		auto
+				p_end =
+				split
+				<
+					decltype( boost::rbegin( srange( data ) ) ),
+					decltype( std::back_inserter( after_split ) ),
+					4
+				>
+				(
+					boost::rbegin( srange( data ) ),
+					boost::rend( srange( data ) ),
+					std::back_inserter( after_split )
+				);
+		std::vector< std::pair< tem, tem > > ret;
+		std::transform(
+					after_split.begin( ),
+					after_split.end( ),
+					std::back_inserter( ret ),
+					[&]( decltype( * after_split.begin( ) ) b ){ return std::make_pair( b, p_end ); } );
+		return ret;
+	}
 	struct game_2048
 	{
 		std::array< std::array< square, 4 >, 4 > data;
@@ -223,7 +292,7 @@ namespace misc
 		enum direction { left, right, up, down };
 		void random_add( )
 		{
-			auto pred = [](square & s){ return s.empty( ); };
+			auto pred = []( square & s ){ return s.empty( ); };
 			auto i_begin = boost::make_filter_iterator( pred, begin( ), end( ) );
 			auto i_end = boost::make_filter_iterator( pred, end( ), end( ) );
 			std::random_device rd;
@@ -237,108 +306,82 @@ namespace misc
 				--distance;
 			}
 		}
+		decltype( dleft_to_right( data ) ) left_to_right( ) { return dleft_to_right( data ); }
+		decltype( dright_to_left( data ) ) right_to_left( ) { return dright_to_left( data ); }
+		decltype( dup_to_down( data ) ) up_to_down( ) { return dup_to_down( data ); }
+		decltype( ddown_to_up( data ) ) down_to_up( ) { return ddown_to_up( data ); }
 		void move( direction dir )
 		{
-			switch ( dir )
+			if ( dir == left )
 			{
-				case left:
-					std::for_each(
-								data.begin( ),
-								data.end( ),
-								[]( decltype( data[0] ) data ){ square::merge( data.begin( ), data.end( ), data.begin( ) ); } );
-					break;
-				case right:
-					std::for_each(
-								data.begin( ),
-								data.end( ),
-								[]( decltype( data[0] ) data ){ square::merge( data.rbegin( ), data.rend( ), data.rbegin( ) ); } );
-					break;
-				case up:
-				case down:
-					if ( dir == down )
-					{
-						typedef skipping_iterator< decltype( begin( ) ), 4 > tem;
-						std::vector< tem > ret;
-						auto
-								p_end =
-								split
-									<
-										decltype( begin( ) ),
-										decltype( std::back_inserter( ret ) ),
-										4
-									>
-									(
-										begin( ),
-										end( ),
-										std::back_inserter( ret )
-									);
-						std::for_each( ret.begin( ), ret.end( ), [&]( decltype( * ret.begin( ) ) b ){ square::merge( b, p_end, b ); } );
-					}
-					else
-					{
-						assert( dir == up );
-						typedef skipping_iterator< decltype( rbegin( ) ), 4 > tem;
-						std::vector< tem > ret;
-						auto
-								p_end =
-								split
-								<
-									decltype( rbegin( ) ),
-									decltype( std::back_inserter( ret ) ),
-									4
-								>
-								(
-									rbegin( ),
-									rend( ),
-									std::back_inserter( ret )
-								);
-						std::for_each( ret.begin( ), ret.end( ), [&]( decltype( * ret.begin( ) ) b ){ square::merge( b, p_end, b ); } );
-					}
-					break;
+				auto d = dleft_to_right( data );
+				std::for_each(
+							d.begin( ),
+							d.end( ),
+							[]( decltype( d[0] ) data ){ square::merge( data.first, data.second, data.first ); } );
 			}
+			else if ( dir == right )
+			{
+				auto d = dright_to_left( data );
+				std::for_each(
+							d.begin( ),
+							d.end( ),
+							[]( decltype( d[0] ) data ){ square::merge( data.first, data.second, data.first ); } );
+			}
+			else if ( dir == up )
+			{
+				auto d = dup_to_down( data );
+				std::for_each(
+							d.begin( ),
+							d.end( ),
+							[]( decltype( d[0] ) data ){ square::merge( data.first, data.second, data.first ); } );
+			}
+			else
+			{
+				assert( dir ==  down );
+				auto d = ddown_to_up( data );
+				std::for_each(
+							d.begin( ),
+							d.end( ),
+							[]( decltype( d[0] ) data ){ square::merge( data.first, data.second, data.first ); } );
+			}
+			random_add( );
 		}
 		bool can_move( ) { return can_move( up ) || can_move( down ) || can_move( left ) || can_move( right ); }
 		bool can_move( direction dir )
 		{
-			switch ( dir )
+			if ( dir == left )
 			{
-				case left:
-					return
-							std::find_if(
-								data.begin( ),
-								data.end( ),
-								[]( decltype( data[0] ) data ){ return square::can_merge( data.begin( ), data.end( ) ); } ) != data.end( );
-				case right:
-					return
-							std::find_if(
-								data.begin( ),
-								data.end( ),
-								[]( decltype( data[0] ) data ){ return square::can_merge( data.rbegin( ), data.rend( ) ); } ) != data.end( );
-				case up:
-				case down:
-					std::array< std::array< square, 4 >, 4 > rotated_data =
-					{
-						std::array< square, 4 > { data[0][0], data[1][0], data[2][0], data[3][0] },
-						std::array< square, 4 > { data[0][1], data[1][1], data[2][1], data[3][1] },
-						std::array< square, 4 > { data[0][2], data[1][2], data[2][2], data[3][2] },
-						std::array< square, 4 > { data[0][3], data[1][3], data[2][3], data[3][3] }
-					};
-					if ( dir == up )
-					{
-						return
-								std::find_if(
-									rotated_data.rbegin( ),
-									rotated_data.rend( ),
-									[]( decltype( data[0] ) data ){ return square::can_merge( data.rbegin( ), data.rend( ) ); } ) != rotated_data.rend( );
-					}
-					else
-					{
-						return
-								std::find_if(
-									rotated_data.begin( ),
-									rotated_data.end( ),
-									[]( decltype( data[0] ) data ){ return square::can_merge( data.rbegin( ), data.rend( ) ); } ) != rotated_data.end( );
-					}
+				auto d = dleft_to_right( data );
+				return std::find_if(
+							d.begin( ),
+							d.end( ),
+							[]( decltype( d[0] ) data ){ return square::can_merge( data.first, data.second ); } ) != d.end( );
+			}
+			else if ( dir == right )
+			{
+				auto d = dleft_to_right( data );
+				return std::find_if(
+							d.begin( ),
+							d.end( ),
+							[]( decltype( d[0] ) data ){ return square::can_merge( data.first, data.second ); } ) != d.end( );
+			}
+			else if ( dir == up )
+			{
+				auto d = dleft_to_right( data );
+				return std::find_if(
+							d.begin( ),
+							d.end( ),
+							[]( decltype( d[0] ) data ){ return square::can_merge( data.first, data.second ); } ) != d.end( );
+			}
+			else
+			{
+				assert( dir ==  down );
+				auto d = dleft_to_right( data );
+				return std::find_if(
+							d.begin( ),
+							d.end( ),
+							[]( decltype( d[0] ) data ){ return square::can_merge( data.first, data.second ); } ) != d.end( );
 			}
 		}
 		template< typename O >
@@ -352,7 +395,6 @@ namespace misc
 			return o;
 		}
 	};
-
 	using namespace boost::mpl::placeholders;
 	typedef boost::mpl::vector_c< int, 1, 0, 0, 0, 0, 0, 0 > mass;
 	typedef boost::mpl::vector_c< int, 0, 1, 0, 0, 0, 0, 0 > time;
@@ -400,5 +442,5 @@ namespace misc
 	DEFINE_MULTIPLY_UNIT( force, time, impluse );
 	DEFINE_DIVIDE_UNIT( mass, volume, density );
 	typedef divide_type< divide_type< work, mass >::type, temperature >::type specific_heat;
-} 
+}
 #endif //MISC_HPP
