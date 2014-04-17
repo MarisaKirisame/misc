@@ -92,35 +92,40 @@ namespace misc
 			skipping_iterator tem = *this;
 			return tem -= n;
 		}
-		double operator - ( const skipping_iterator & rhs ) const { return static_cast< double >( distance_to_end - rhs.distance_to_end ) / skip_size; }
+		size_t operator - ( const skipping_iterator & rhs ) const
+		{
+			if ( ( rhs.distance_to_end - distance_to_end ) % skip_size == 0 )
+			{ return ( rhs.distance_to_end - distance_to_end ) / skip_size; }
+			else
+			{ return ( ( rhs.distance_to_end - distance_to_end ) - ( rhs.distance_to_end - distance_to_end ) % skip_size ) / skip_size + 1; }
+		}
 		decltype( * current ) operator [ ]( size_t n ) const { return *( *this + n ); }
 		bool operator < ( const skipping_iterator & comp ) { return ( comp - *this ) > 0; }
 		bool operator > ( const skipping_iterator & comp ) { return comp < *this; }
 		bool operator >= ( const skipping_iterator & comp ) { return !( *this < comp ); }
 		bool operator <= ( const skipping_iterator & comp ) { return !( *this > comp ); }
 		skipping_iterator( iterator current, iterator end ) : current( current ), distance_to_end( std::distance( current, end ) ) { }
+		skipping_iterator( iterator current, size_t distance_to_end ) : current( current ), distance_to_end( distance_to_end ) { }
 	};
 	template< typename it, typename op, size_t n >
-	auto split( it begin, it end, op out )
+	void split( it begin, it end, op out )
 	{
 		std::transform( boost::counting_iterator< size_t >( 0 ),
 										boost::counting_iterator< size_t >( n ),
 										out,
-										[&](size_t)
+										[&]( size_t )
 		{
 			auto ret = skipping_iterator< it, n >( begin, end );
 			++begin;
-			return ret;
+			return std::make_pair( ret, skipping_iterator< it, n >( begin, 0 ) );
 		} );
-		return skipping_iterator< it, n >( begin, begin );
 	}
 	struct square
 	{
 		square & operator ++ ( ) { ++num; return * this; }
 		size_t num;
 		bool empty( ) const { return num == 0; }
-		template< typename O >
-		friend O & operator << ( O & o, const square & s ) { return o << s.num == 0 ? 0 : std::pow( 2, s.num ); }
+		operator size_t( ) const { return num == 0 ? 0 : std::pow( 2, num ); }
 		template< typename iterator >
 		static bool can_merge( iterator begin, iterator end )
 		{
@@ -143,32 +148,12 @@ namespace misc
 			{
 				auto second = ibegin;
 				++second;
-				if ( std::distance( ibegin, iend ) == 2 )
-				{
-					if ( ( ibegin->num != 0 && ibegin->num == second->num ) )
-					{
-						*obegin = square( 0 );
-						++obegin;
-						++( *obegin );
-					}
-					else if ( ibegin->num == 0 && second->num != 0 )
-					{
-						*obegin = *second;
-						++obegin;
-						*obegin = *ibegin;
-					}
-				}
-				else
-				{
-					std::vector< square > tem;
-					std::for_each(
-								ibegin,
-								iend,
-								[&]( const square & s )
-					{
-						if ( ! s.empty( ) )
-						{ tem.push_back( s ); }
-					} );
+				std::vector< square > tem;
+				std::copy_if(
+							ibegin,
+							iend,
+							std::back_inserter( tem ),
+							[&]( const square & s ) { return ! s.empty( ); } );
 					std::vector< square > ret;
 					while ( ! tem.empty( ) )
 					{
@@ -181,17 +166,16 @@ namespace misc
 						}
 						ret.push_back( std::move( s ) );
 					}
-					std::transform(
+					obegin = std::transform(
 								boost::counting_iterator< size_t >( 0 ),
 								boost::counting_iterator< size_t >( std::distance( ibegin, iend ) - ret.size( ) ),
 								obegin,
 								[]( size_t ){ return square( ); } );
-					std::copy( ret.begin( ), ret.end( ), obegin );
-				}
+					std::copy( ret.rbegin( ), ret.rend( ), obegin );
 			}
 		}
 		square( ) : square( 0 ) { }
-		square( size_t num ) : num( num ) { }
+		explicit square( size_t num ) : num( num ) { }
 	};
 	template< typename Data >
 	auto srange( Data & data )
@@ -220,7 +204,17 @@ namespace misc
 					std::back_inserter( ret ),
 					[]( decltype( data[0] ) data ){ return std::make_pair( data.begin( ), data.end( ) ); } );
 		return ret;
-	}
+	}//GCC Workaround
+	auto dcleft_to_right( const std::array< std::array< square, 4 >, 4 > & data )
+	{
+		std::vector< std::pair< decltype( data[0].cbegin( ) ), decltype( data[0].cbegin( ) ) > > ret;
+		std::transform(
+					data.cbegin( ),
+					data.cend( ),
+					std::back_inserter( ret ),
+					[]( decltype( data[0] ) data ){ return std::make_pair( data.cbegin( ), data.cend( ) ); } );
+		return ret;
+	}//GCC Workaround
 	auto dright_to_left( std::array< std::array< square, 4 >, 4 > & data )
 	{
 		std::vector< std::pair< decltype( data[0].rbegin( ) ), decltype( data[0].rbegin( ) ) > > ret;
@@ -230,59 +224,88 @@ namespace misc
 					std::back_inserter( ret ),
 					[]( decltype( data[0] ) data ){ return std::make_pair( data.rbegin( ), data.rend( ) ); } );
 		return ret;
-	}
+	}//GCC Workaround
+	auto dcright_to_left( const std::array< std::array< square, 4 >, 4 > & data )
+	{
+		std::vector< std::pair< decltype( data[0].crbegin( ) ), decltype( data[0].crbegin( ) ) > > ret;
+		std::transform(
+					data.begin( ),
+					data.end( ),
+					std::back_inserter( ret ),
+					[]( decltype( data[0] ) data ){ return std::make_pair( data.crbegin( ), data.crend( ) ); } );
+		return ret;
+	}//GCC Workaround
 	auto dup_to_down( std::array< std::array< square, 4 >, 4 > & data )
 	{
 		typedef skipping_iterator< decltype( srange( data ).begin( ) ), 4 > tem;
-		std::vector< tem > after_split;
-		auto
-				p_end =
-				split
-					<
-						decltype( srange( data ).begin( ) ),
-						decltype( std::back_inserter( after_split ) ),
-						4
-					>
-					(
-						srange( data ).begin( ),
-						srange( data ).end( ),
-						std::back_inserter( after_split )
-					);
-		std::vector< std::pair< tem, tem > > ret;
-		std::transform(
-					after_split.begin( ),
-					after_split.end( ),
-					std::back_inserter( ret ),
-					[&]( decltype( * after_split.begin( ) ) b ){ return std::make_pair( b, p_end ); } );
-		return ret;
-	}
+		std::vector< std::pair< tem, tem > > after_split;
+		split
+		<
+			decltype( srange( data ).begin( ) ),
+			decltype( std::back_inserter( after_split ) ),
+			4
+		>
+		(
+			srange( data ).begin( ),
+			srange( data ).end( ),
+			std::back_inserter( after_split )
+		);
+		return after_split;
+	}//GCC Workaround
+	auto dcup_to_down( const std::array< std::array< square, 4 >, 4 > & data )
+	{
+		typedef skipping_iterator< decltype( srange( data ).begin( ) ), 4 > tem;
+		std::vector< std::pair< tem, tem > > after_split;
+		split
+		<
+			decltype( srange( data ).begin( ) ),
+			decltype( std::back_inserter( after_split ) ),
+			4
+		>
+		(
+			srange( data ).begin( ),
+			srange( data ).end( ),
+			std::back_inserter( after_split )
+		);
+		return after_split;
+	}//GCC Workaround
 	auto ddown_to_up( std::array< std::array< square, 4 >, 4 > & data )
 	{
 		typedef skipping_iterator< decltype( boost::rbegin( srange( data ) ) ), 4 > tem;
-		std::vector< tem > after_split;
-		auto
-				p_end =
-				split
-				<
-					decltype( boost::rbegin( srange( data ) ) ),
-					decltype( std::back_inserter( after_split ) ),
-					4
-				>
-				(
-					boost::rbegin( srange( data ) ),
-					boost::rend( srange( data ) ),
-					std::back_inserter( after_split )
-				);
-		std::vector< std::pair< tem, tem > > ret;
-		std::transform(
-					after_split.begin( ),
-					after_split.end( ),
-					std::back_inserter( ret ),
-					[&]( decltype( * after_split.begin( ) ) b ){ return std::make_pair( b, p_end ); } );
-		return ret;
-	}
+		std::vector< std::pair< tem, tem > > after_split;
+		split
+		<
+			decltype( boost::rbegin( srange( data ) ) ),
+			decltype( std::back_inserter( after_split ) ),
+			4
+		>
+		(
+			boost::rbegin( srange( data ) ),
+			boost::rend( srange( data ) ),
+			std::back_inserter( after_split )
+		);
+		return after_split;
+	}//GCC Workaround
+	auto dcdown_to_up( const std::array< std::array< square, 4 >, 4 > & data )
+	{
+		typedef skipping_iterator< decltype( boost::rbegin( srange( data ) ) ), 4 > tem;
+		std::vector< std::pair< tem, tem > > after_split;
+		split
+		<
+			decltype( boost::rbegin( srange( data ) ) ),
+			decltype( std::back_inserter( after_split ) ),
+			4
+		>
+		(
+			boost::rbegin( srange( data ) ),
+			boost::rend( srange( data ) ),
+			std::back_inserter( after_split )
+		);
+		return after_split;
+	}//GCC Workaround
 	struct game_2048
 	{
+		game_2048( ) { }
 		std::array< std::array< square, 4 >, 4 > data;
 		decltype( srange( data ) ) range( ) { return srange( data ); }
 		decltype( srange( data ).begin( ) ) begin( ) { return range( ).begin( ); }
@@ -307,14 +330,18 @@ namespace misc
 			}
 		}
 		decltype( dleft_to_right( data ) ) left_to_right( ) { return dleft_to_right( data ); }
+		decltype( dcleft_to_right( data ) ) left_to_right( ) const { return dcleft_to_right( data ); }
 		decltype( dright_to_left( data ) ) right_to_left( ) { return dright_to_left( data ); }
+		decltype( dcright_to_left( data ) ) right_to_left( ) const { return dcright_to_left( data ); }
 		decltype( dup_to_down( data ) ) up_to_down( ) { return dup_to_down( data ); }
+		decltype( dcup_to_down( data ) ) up_to_down( ) const { return dcup_to_down( data ); }
 		decltype( ddown_to_up( data ) ) down_to_up( ) { return ddown_to_up( data ); }
-		void move( direction dir )
+		decltype( dcdown_to_up( data ) ) down_to_up( ) const { return dcdown_to_up( data ); }
+		void move( direction dir, bool add_new = true )
 		{
 			if ( dir == left )
 			{
-				auto d = dleft_to_right( data );
+				auto d = right_to_left( );
 				std::for_each(
 							d.begin( ),
 							d.end( ),
@@ -322,7 +349,7 @@ namespace misc
 			}
 			else if ( dir == right )
 			{
-				auto d = dright_to_left( data );
+				auto d = left_to_right( );
 				std::for_each(
 							d.begin( ),
 							d.end( ),
@@ -330,7 +357,7 @@ namespace misc
 			}
 			else if ( dir == up )
 			{
-				auto d = dup_to_down( data );
+				auto d = down_to_up( );
 				std::for_each(
 							d.begin( ),
 							d.end( ),
@@ -339,20 +366,20 @@ namespace misc
 			else
 			{
 				assert( dir ==  down );
-				auto d = ddown_to_up( data );
+				auto d = up_to_down( );
 				std::for_each(
 							d.begin( ),
 							d.end( ),
 							[]( decltype( d[0] ) data ){ square::merge( data.first, data.second, data.first ); } );
 			}
-			random_add( );
+			if ( add_new ) { random_add( ); }
 		}
-		bool can_move( ) { return can_move( up ) || can_move( down ) || can_move( left ) || can_move( right ); }
-		bool can_move( direction dir )
+		bool can_move( ) const { return can_move( up ) || can_move( down ) || can_move( left ) || can_move( right ); }
+		bool can_move( direction dir ) const
 		{
 			if ( dir == left )
 			{
-				auto d = dleft_to_right( data );
+				auto d = right_to_left( );
 				return std::find_if(
 							d.begin( ),
 							d.end( ),
@@ -360,7 +387,7 @@ namespace misc
 			}
 			else if ( dir == right )
 			{
-				auto d = dleft_to_right( data );
+				auto d = left_to_right( );
 				return std::find_if(
 							d.begin( ),
 							d.end( ),
@@ -368,7 +395,7 @@ namespace misc
 			}
 			else if ( dir == up )
 			{
-				auto d = dleft_to_right( data );
+				auto d = down_to_up( );
 				return std::find_if(
 							d.begin( ),
 							d.end( ),
@@ -377,7 +404,7 @@ namespace misc
 			else
 			{
 				assert( dir ==  down );
-				auto d = dleft_to_right( data );
+				auto d = up_to_down( );
 				return std::find_if(
 							d.begin( ),
 							d.end( ),
@@ -388,10 +415,10 @@ namespace misc
 		friend O & operator << ( O & o, const game_2048 & s )
 		{
 			o
-					<< s.data[0][0] << s.data[0][1] << s.data[0][2] << s.data[0][3] << std::endl
-					<< s.data[1][0] << s.data[1][1] << s.data[1][2] << s.data[1][3] << std::endl
-					<< s.data[2][0] << s.data[2][1] << s.data[2][2] << s.data[2][3] << std::endl
-					<< s.data[3][0] << s.data[3][1] << s.data[3][2] << s.data[3][3] << std::endl;
+					<< s.data[0][0] <<  "|" << s.data[0][1] << "|" << s.data[0][2] << "|" << s.data[0][3] << std::endl
+					<< s.data[1][0] <<  "|" << s.data[1][1] << "|" << s.data[1][2] << "|" << s.data[1][3] << std::endl
+					<< s.data[2][0] <<  "|" << s.data[2][1] << "|" << s.data[2][2] << "|" << s.data[2][3] << std::endl
+					<< s.data[3][0] <<  "|" << s.data[3][1] << "|" << s.data[3][2] << "|" << s.data[3][3] << std::endl;
 			return o;
 		}
 	};
