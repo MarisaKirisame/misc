@@ -1,5 +1,10 @@
 #ifndef MISC_HPP
 #define MISC_HPP
+#include <iterator>
+#include <boost/mpl/bool.hpp>
+#include <boost/mpl/same_as.hpp>
+#include <boost/type_traits/is_same.hpp>
+#include <boost/type_traits/remove_reference.hpp>
 #include <array>
 #include <cmath>
 #include <algorithm>
@@ -432,28 +437,24 @@ namespace misc
 	typedef boost::mpl::vector_c< int, 0, 0, 0, 0, 0, 0, 1 > substance_quantity;
 	typedef boost::mpl::vector_c< int, 0, 0, 0, 0, 0, 0, 0 > ratio;
 	template< typename t1, typename t2 >
-	struct multiply_type
-	{
-		typedef typename
-		boost::mpl::transform
-		<
-			t1,
-			t2,
-			boost::mpl::plus< _1, _2 >
-		>::type type;
-	};
+	struct multiply :
+			boost::mpl::transform
+			<
+				t1,
+				t2,
+				boost::mpl::plus< _1, _2 >
+			>
+	{ };
 	template< typename t1, typename t2 >
-	struct divide_type
-	{
-		typedef typename boost::mpl::transform
-		<
-			t1,
-			t2,
-			boost::mpl::minus< _1, _2 >
-		>::type type;
-	};
-#define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply_type< t1, t2 >::type t3
-#define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide_type< t1, t2 >::type t3
+	struct divide : boost::mpl::transform
+			<
+				t1,
+				t2,
+				boost::mpl::minus< _1, _2 >
+			>
+	{ };
+#define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
+#define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
 	DEFINE_DIVIDE_UNIT( length, time, velocity );
 	DEFINE_DIVIDE_UNIT( velocity, time, accleration );
 	DEFINE_MULTIPLY_UNIT( mass, accleration, force );
@@ -468,6 +469,113 @@ namespace misc
 	DEFINE_MULTIPLY_UNIT( mass, velocity, momentum );
 	DEFINE_MULTIPLY_UNIT( force, time, impluse );
 	DEFINE_DIVIDE_UNIT( mass, volume, density );
-	typedef divide_type< divide_type< work, mass >::type, temperature >::type specific_heat;
+	typedef divide< divide< work, mass >::type, temperature >::type specific_heat;
+	template< typename T >
+	T construct( );
+	template< typename T, typename ... R >
+	struct can_call
+	{
+		template< typename t >
+		static boost::mpl::true_ SFINAE( t tt, typename boost::remove_reference< decltype( tt( construct< R >( )... ) ) >::type * = nullptr )
+		{ return boost::mpl::true_( ); }
+		static boost::mpl::false_ SFINAE( ... ) { return boost::mpl::false_( ); }
+		static constexpr bool value = decltype( SFINAE( construct< T >( ) ) )::value;
+	};
+
+	template< typename T1, typename T2, bool b1 = can_call< T1 >::value, bool b2 = can_call< T2 >::value >
+	struct expansion;
+	template< typename T1, typename T2 >
+	struct expansion< T1, T2, false, false >
+	{
+		T1 first;
+		T2 second;
+		template< typename T, typename ... R >
+		decltype( first( construct< T >( ), construct< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		template< typename ... R >
+		decltype( second( construct< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
+	};
+	template< typename T1, typename T2 >
+	struct expansion< T1, T2, false, true >
+	{
+		T1 first;
+		T2 second;
+		decltype( construct< T2 >( )( ) ) operator ( )( ) { return second( ); }
+		template< typename T, typename ... R >
+		decltype( first( construct< T >( ), construct< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		template< typename ... R >
+		decltype( second( construct< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
+	};
+	template< typename T1, typename T2, bool b >
+	struct expansion< T1, T2, true, b >
+	{
+		T1 first;
+		T2 second;
+		decltype( construct< T1 >( )( ) ) operator ( )( ) { return first( ); }
+		template< typename T, typename ... R >
+		decltype( first( construct< T >( ), construct< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		template< typename ... R >
+		decltype( second( construct< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
+	};
+
+	template< typename T1, typename T2 >
+	expansion< T1, T2 > make_expansion( const T1 & t1, const T2 & t2 )
+	{
+		return expansion< T1, T2 >( t1, t2 );
+	}
+
+	struct non_returnable
+	{
+		non_returnable( non_returnable && ) = delete;
+		non_returnable( const non_returnable & ) = delete;
+		non_returnable( ) = delete;
+	};
+
+	template< typename T1, typename T2, bool b1 = can_call< T1 >::value, bool b2 = can_call< T2 >::value >
+	struct restriction;
+	template< typename T1, typename T2 >
+	struct restriction< T1, T2, false, false >
+	{
+		T1 first;
+		T2 second;
+		template< typename ... R >
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type operator ( )( const R & ... r ) { return first( r ... ); }
+		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
+	};
+	template< typename T1, typename T2 >
+	struct restriction< T1, T2, false, true >
+	{
+		T1 first;
+		T2 second;
+		template< typename ... R >
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type operator ( )( const R & ... r ) { return first( r ... ); }
+		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
+	};
+	template< typename T1, typename T2 >
+	struct restriction< T1, T2, true, false >
+	{
+		T1 first;
+		T2 second;
+		decltype( construct< T1 >( )( ) ) operator ( )( ) { return first( ); }
+		template< typename ... R >
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type operator ( )( const R & ... r ) { return first( r ... ); }
+		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
+	};
+	template< typename T1, typename T2 >
+	struct restriction< T1, T2, true, true >
+	{
+		T1 first;
+		T2 second;
+		template< typename ... R >
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type operator ( )( const R & ... r ) { return first( r ... ); }
+		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
+	};
+	template< typename T1, typename T2 >
+	restriction< T1, T2 > make_restriction( const T1 & t1, const T2 & t2 )
+	{
+		return restriction< T1, T2 >( t1, t2 );
+	}
 }
 #endif //MISC_HPP
