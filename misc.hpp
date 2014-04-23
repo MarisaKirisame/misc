@@ -198,15 +198,15 @@ namespace misc
 		{ rem_first( last_argument( r ... ), std::forward< const R & >( r ) ... ); }
 		template< typename TT >
 		void operator ( )( const TT & tt ) { tt( t( ) ); }
-		struct loop_cycle_tag{ };
+		struct loop_cycle_end_tag{ };
 		template< typename TT, typename ... R >
 		void rem_first( const TT & cb, const R & ... r )
-		{ rem_first_inner_loop( cb, std::forward< const R & >( r ) ..., loop_cycle_tag( ) ); }
+		{ rem_first_inner_loop( cb, std::forward< const R & >( r ) ..., loop_cycle_end_tag( ) ); }
 		template< typename TT, typename ARG1, typename ... R >
 		void rem_first_inner_loop( const TT & tt, const ARG1 & a, const R & ... r )
 		{ rem_first_inner_loop( tt, std::forward< const R & >( r ) ..., a ); }
 		template< typename TT, typename ARG1, typename ... R >
-		void rem_first_inner_loop( const TT & tt, const ARG1 &, const loop_cycle_tag &, const R & ... r )
+		void rem_first_inner_loop( const TT & tt, const ARG1 &, const loop_cycle_end_tag &, const R & ... r )
 		{ tt( t( std::forward< const R & >( r ) ... ) ); }
 		template< typename TT, typename ARG1 >
 		void rem_first( const TT & cb, const ARG1 & a ) { cb( a ); }
