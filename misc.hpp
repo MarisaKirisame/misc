@@ -178,12 +178,36 @@ namespace misc
 	{
 		return restriction< T1, T2 >( t1, t2 );
 	}
+	template< typename ... R >
+	struct last_template_argument;
+	template< typename T >
+	struct last_template_argument< T > { typedef T type; };
+	template< typename T, typename ... R >
+	struct last_template_argument< T, R ... > { typedef typename last_template_argument< R ... >::type type; };
+	template< typename T >
+	T last_argument( const T & t ) { return t; }
+	template< typename T, typename ... R >
+	typename last_template_argument< R ... >::type last_argument( const T &, const R & ... r )
+	{ return last_argument( std::forward< const R & >( r ) ... ); }
 	template< typename T >
 	struct CPS
 	{
 		T t;
-		template< typename ... R, typename K >
-		void operator ( )( const R & ... r, const K & k ) { k( t( r ... ) ); }
+		template< typename ... R >
+		void operator ( )( const R & ... r )
+		{ rem_first( last_argument( r ... ), std::forward< const R & >( r ) ... ); }
+		struct loop_cycle_tag{ };
+		template< typename TT, typename ... R >
+		void rem_first( const TT & cb, const R & ... r )
+		{ rem_first_inner_loop( cb, std::forward< const R & >( r ) ..., loop_cycle_tag( ) ); }
+		template< typename TT, typename ARG1, typename ... R >
+		void rem_first_inner_loop( const TT & tt, const ARG1 & a, const R & ... r )
+		{ rem_first_inner_loop( tt, std::forward< const R & >( r ) ..., a ); }
+		template< typename TT, typename ARG1, typename ... R >
+		void rem_first_inner_loop( const TT & tt, const ARG1 &, const loop_cycle_tag &, const R & ... r )
+		{ tt( t( std::forward< const R & >( r ) ... ) ); }
+		template< typename TT, typename ARG1 >
+		void rem_first( const TT & cb, const ARG1 & a ) { cb( a ); }
 		CPS( const T & t ) : t( t ) { }
 		CPS( T && t ) : t( std::move( t ) ) { }
 	};
