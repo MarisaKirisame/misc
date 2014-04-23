@@ -178,5 +178,18 @@ namespace misc
 	{
 		return restriction< T1, T2 >( t1, t2 );
 	}
+	template< typename T >
+	struct CPS
+	{
+		T t;
+		template< typename ... R, typename K >
+		void operator ( )( const R & ... r, const K & k ) { k( t( r ... ) ); }
+		CPS( const T & t ) : t( t ) { }
+		CPS( T && t ) : t( std::move( t ) ) { }
+	};
+	template< typename T >
+	CPS< T > make_CPS( const T & t ) { return CPS< T >( t ); }
+	template< typename T >
+	CPS< T > make_CPS( T && t ) { return CPS< T >( std::move( t ) ); }
 }
 #endif //MISC_HPP
