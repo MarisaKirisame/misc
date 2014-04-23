@@ -188,28 +188,28 @@ namespace misc
 	T last_argument( const T & t ) { return t; }
 	template< typename T, typename ... R >
 	typename last_template_argument< R ... >::type last_argument( const T &, const R & ... r )
-	{ return last_argument( std::forward< const R & >( r ) ... ); }
+	{ return last_argument( r ... ); }
 	template< typename T >
 	struct CPS
 	{
 		T t;
 		template< typename ... R >
 		void operator ( )( const R & ... r )
-		{ rem_first( last_argument( r ... ), std::forward< const R & >( r ) ... ); }
-		template< typename TT >
-		void operator ( )( const TT & tt ) { tt( t( ) ); }
+		{ rem_first( last_argument( r ... ), r ... ); }
+		template< typename K >
+		void operator ( )( const K & k ) { k( t( ) ); }
 		struct loop_cycle_end_tag{ };
-		template< typename TT, typename ... R >
-		void rem_first( const TT & cb, const R & ... r )
-		{ rem_first_inner_loop( cb, std::forward< const R & >( r ) ..., loop_cycle_end_tag( ) ); }
-		template< typename TT, typename ARG1, typename ... R >
-		void rem_first_inner_loop( const TT & tt, const ARG1 & a, const R & ... r )
-		{ rem_first_inner_loop( tt, std::forward< const R & >( r ) ..., a ); }
-		template< typename TT, typename ARG1, typename ... R >
-		void rem_first_inner_loop( const TT & tt, const ARG1 &, const loop_cycle_end_tag &, const R & ... r )
-		{ tt( t( std::forward< const R & >( r ) ... ) ); }
-		template< typename TT, typename ARG1 >
-		void rem_first( const TT & cb, const ARG1 & a ) { cb( a ); }
+		template< typename K, typename ... R >
+		void rem_first( const K & k, const R & ... r )
+		{ rem_first_inner_loop( k, r ..., loop_cycle_end_tag( ) ); }
+		template< typename K, typename ARG1, typename ... R >
+		void rem_first_inner_loop( const K & k, const ARG1 & a, const R & ... r )
+		{ rem_first_inner_loop( k, r ..., a ); }
+		template< typename K, typename ARG1, typename ... R >
+		void rem_first_inner_loop( const K & k, const ARG1 &, const loop_cycle_end_tag &, const R & ... r )
+		{ k( t( r ... ) ); }
+		template< typename K, typename ARG1 >
+		void rem_first( const K & k, const ARG1 & a ) { k( a ); }
 		CPS( const T & t ) : t( t ) { }
 		CPS( T && t ) : t( std::move( t ) ) { }
 	};
