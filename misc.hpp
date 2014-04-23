@@ -196,6 +196,8 @@ namespace misc
 		template< typename ... R >
 		void operator ( )( const R & ... r )
 		{ rem_first( last_argument( r ... ), std::forward< const R & >( r ) ... ); }
+		template< typename TT >
+		void operator ( )( const TT & tt ) { tt( t( ) ); }
 		struct loop_cycle_tag{ };
 		template< typename TT, typename ... R >
 		void rem_first( const TT & cb, const R & ... r )
