@@ -28,60 +28,79 @@
 #include <boost/iterator/filter_iterator.hpp>
 #include <iostream>
 #include <type_traits>
-#include <functional>
-#define DECLARE_MEMBER_VARIABLE_NAME( NAME ) struct NAME ## _member_variable_tag{ }
-#define DECLARE_MEMBER_FUNCTION_NAME( NAME ) struct NAME ## _member_function_tag{ }
-#define DECLARE_STATIC_FUNCTION_NAME( NAME ) struct NAME ## _static_function_tag{ }
-#define DECLARE_NAME( NAME ) \
-	DECLARE_MEMBER_VARIABLE_NAME( NAME ); \
-	DECLARE_MEMBER_FUNCTION_NAME( NAME ); \
-	DECLARE_STATIC_FUNCTION_NAME( NAME )
+#define DECLARE_NAME( NAME ) struct NAME ## _tag{ }
 #define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
 #define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
-#define DECLARE_MEMBER_VARIABLE( NAME ) \
-template< typename T > \
+#define DECLARE_POSSIBLE_MEMBER_VARIABLE( NAME ) \
+template< typename T, typename SELF > \
 constexpr static bool have_member_variable( \
 	typename std::enable_if \
 	< \
-		std::is_same< T, NAME ## _member_variable_tag >::value \
+		std::is_same \
+		< \
+			T, \
+			NAME ## _tag \
+		>::value && \
+		std::is_member_object_pointer< decltype( & SELF::NAME ) >::value, \
+		decltype( construct< SELF * >( )->NAME ) \
 	>::type * ) \
 { return true; } \
-template< typename T > \
-static decltype( NAME ) get_member_variable( \
+template< typename T, typename SELF > \
+static decltype( construct< SELF * >( )->NAME ) get_member_variable( \
 	typename std::enable_if \
 	< \
-		std::is_same< T, NAME ## _member_variable_tag >::value \
+		std::is_same< T, NAME ## _tag >::value \
+	>::type * )
+#define DECLARE_POSSIBLE_STATIC_VARIABLE( NAME ) \
+template< typename T, typename SELF > \
+constexpr static bool have_static_variable( \
+	typename std::enable_if \
+	< \
+		std::is_same \
+		< \
+			T, \
+			NAME ## _tag \
+		>::value, \
+		decltype( SELF::NAME ) \
+	>::type * ) \
+{ return true; } \
+template< typename T, typename SELF > \
+static decltype( SELF::NAME ) get_static_variable( \
+	typename std::enable_if \
+	< \
+		std::is_same< T, NAME ## _tag >::value \
 	>::type * )
 template< typename T >
 T construct( );
-#define DECLARE_MEMBER_FUNCTION( NAME ) \
-	template< typename T, typename ... R > \
+#define DECLARE_POSSIBLE_MEMBER_FUNCTION( NAME ) \
+	template< typename T, typename SELF, typename ... R > \
 	constexpr static bool have_member_function( \
 		typename std::enable_if \
 		< \
 			std::is_same \
 			< \
 				T, \
-				NAME ## _member_function_tag \
-			>::value, \
+				NAME ## _tag \
+			>::value && \
+			std::is_member_function_pointer< decltype( & SELF::NAME ) >::value, \
 			typename std::add_pointer \
 			< \
-				decltype( get_this( )->NAME( construct< R >( ) ... ) ) \
+				decltype( construct< SELF * >( )->NAME( construct< R >( ) ... ) ) \
 			>::type \
 		>::type ) \
 	{ return true; } \
-	template< typename T, typename ... R > \
+	template< typename T, typename SELF, typename ... R > \
 	typename std::enable_if \
 	< \
 		std::is_same \
 		< \
 			T, \
-			NAME ## _member_function_tag \
+			NAME ## _tag \
 		>::value, \
-		decltype( get_this( )->NAME( construct< R >( ) ... ) ) \
+		decltype( construct< SELF * >( )->NAME( construct< R >( ) ... ) ) \
 	>::type \
 	call_member_function( const R & ...  r ) { return NAME( r ... ); }
-#define DECLARE_STATIC_FUNCTION( NAME ) \
+#define DECLARE_POSSIBLE_STATIC_FUNCTION( NAME ) \
 	template< typename T, typename ... R > \
 	constexpr static bool have_static_function( \
 		typename std::enable_if \
@@ -89,7 +108,7 @@ T construct( );
 			std::is_same \
 			< \
 				T, \
-				NAME ## _static_function_tag \
+				NAME ## _tag \
 			>::value, \
 			typename std::add_pointer \
 			< \
@@ -103,7 +122,7 @@ T construct( );
 		std::is_same \
 		< \
 			T, \
-			NAME ## _static_function_tag \
+			NAME ## _tag \
 		>::value, \
 		decltype( NAME( construct< R >( ) ... ) ) \
 	>::type \
@@ -113,8 +132,10 @@ T construct( );
 	constexpr static bool have_member_function( ... ) { return false; } \
 	template< typename ... > \
 	constexpr static bool have_static_function( ... ) { return false; } \
-	template< typename > \
+	template< typename ... > \
 	constexpr static bool have_member_variable( ... ) { return false; } \
+	template< typename ... > \
+	constexpr static bool have_static_variable( ... ) { return false; } \
 	static TYPE * get_this( )
 namespace misc
 {
@@ -305,27 +326,37 @@ namespace misc
 	DECLARE_NAME( cache );
 	DECLARE_NAME( func );
 	DECLARE_NAME( function );
+	DECLARE_NAME( foo );
 	struct test
 	{
 		DECLARE_TYPE( test );
 		int data;
-		DECLARE_MEMBER_VARIABLE( data );
+		DECLARE_POSSIBLE_MEMBER_VARIABLE( data );
+		DECLARE_POSSIBLE_MEMBER_VARIABLE( cache );
 		void func( int ) { }
-		DECLARE_MEMBER_FUNCTION( func );
+		DECLARE_POSSIBLE_MEMBER_FUNCTION( func );
 		static int function( );
-		DECLARE_STATIC_FUNCTION( function );
+		DECLARE_POSSIBLE_STATIC_FUNCTION( function );
+		DECLARE_POSSIBLE_MEMBER_FUNCTION( foo );
+		DECLARE_POSSIBLE_STATIC_FUNCTION( foo );
+		static void * cache;
+		DECLARE_POSSIBLE_STATIC_VARIABLE( cache );
 	};
 	template< typename TYPE, typename NAME >
-	struct have_member_variable { static constexpr bool value = TYPE::template have_member_variable< NAME >( nullptr ); };
+	struct have_member_variable { static constexpr bool value = TYPE::template have_member_variable< NAME, TYPE >( nullptr ); };
 	template< typename TYPE, typename NAME >
-	struct member_variable_type { typedef decltype( TYPE::template get_member_variable< NAME >( nullptr ) ) type; };
+	struct member_variable_type { typedef decltype( TYPE::template get_member_variable< NAME, TYPE >( nullptr ) ) type; };
+	template< typename TYPE, typename NAME >
+	struct have_static_variable { static constexpr bool value = TYPE::template have_static_variable< NAME, TYPE >( nullptr ); };
+	template< typename TYPE, typename NAME >
+	struct static_variable_type { typedef decltype( TYPE::template get_static_variable< NAME, TYPE >( nullptr ) ) type; };
 	template< typename TYPE, typename NAME, typename ... ARG >
-	struct have_member_function { static constexpr bool value = TYPE::template have_member_function< NAME, ARG ... >( nullptr ); };
+	struct have_member_function { static constexpr bool value = TYPE::template have_member_function< NAME, TYPE, ARG ... >( nullptr ); };
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct member_function_return_type
 	{
 		typedef decltype(
-				construct< TYPE * >( )->template call_member_function< NAME >(
+				construct< TYPE * >( )->template call_member_function< NAME, TYPE >(
 					construct< ARG >( ) ... ) ) type;
 	};
 	template< typename TYPE, typename NAME, typename ... ARG >
@@ -337,15 +368,22 @@ namespace misc
 	};
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct have_static_function { static constexpr bool value = TYPE::template have_static_function< NAME, ARG ... >( nullptr ); };
-	static_assert( have_member_variable< test, data_member_variable_tag >::value, "" );
-	static_assert( ! have_member_variable< test, cache_member_variable_tag >::value, "" );
-	static_assert( std::is_same< member_variable_type< test, data_member_variable_tag >::type, int >::value, "" );
-	static_assert( have_member_function< test, func_member_function_tag, long >::value, "" );
-	static_assert( ! have_member_function< test, func_member_function_tag, void * >::value, "" );
-	static_assert( std::is_same< member_function_return_type< test, func_member_function_tag, long >::type, void >::value, "" );
-	static_assert( ! have_static_function< test, func_static_function_tag >::value, "" );
-	static_assert( have_static_function< test, function_static_function_tag >::value, "" );
-	static_assert( ! have_static_function< test, func_static_function_tag >::value, "" );
-	static_assert( std::is_same< static_function_return_type< test, function_static_function_tag >::type, int >::value, "" );
+	static_assert( have_member_variable< test, data_tag >::value, "" );
+	static_assert( ! have_member_variable< test, cache_tag >::value, "" );
+	static_assert( std::is_same< member_variable_type< test, data_tag >::type, int >::value, "" );
+	static_assert( have_member_function< test, func_tag, long >::value, "" );
+	static_assert( ! have_member_function< test, func_tag, void * >::value, "" );
+	static_assert( std::is_same< member_function_return_type< test, func_tag, long >::type, void >::value, "" );
+	static_assert( ! have_static_function< test, func_tag >::value, "" );
+	static_assert( have_static_function< test, function_tag >::value, "" );
+	static_assert( ! have_static_function< test, func_tag >::value, "" );
+	static_assert( std::is_same< static_function_return_type< test, function_tag >::type, int >::value, "" );
+	static_assert( ! have_member_function< test, foo_tag >::value, "" );
+	static_assert( ! have_static_function< test, foo_tag >::value, "" );
+	static_assert( ! have_member_function< test, function_tag >::value, "" );
+	static_assert( have_static_variable< test, cache_tag >::value, "" );
+	static_assert( ! have_static_variable< test, data_tag >::value, "" );
+	static_assert( have_static_variable< test, cache_tag >::value, "" );
+	static_assert( std::is_same< static_variable_type< test, cache_tag >::type, void * >::value, "" );
 }
 #endif //MISC_HPP
