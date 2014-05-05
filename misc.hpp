@@ -28,6 +28,7 @@
 #include <boost/iterator/filter_iterator.hpp>
 #include <iostream>
 #include <type_traits>
+#include <boost/preprocessor.hpp>
 #define DECLARE_NAME( NAME ) struct NAME ## _tag{ }
 #define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
 #define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
@@ -60,8 +61,8 @@ constexpr static bool have_static_variable( \
 		< \
 			T, \
 			NAME ## _tag \
-		>::value, \
-		decltype( SELF::NAME ) \
+		>::value && \
+		! std::is_member_object_pointer< decltype( & SELF::NAME ) >::value \
 	>::type * ) \
 { return true; } \
 template< typename T, typename SELF > \
@@ -116,7 +117,7 @@ T construct( );
 			>::type \
 		>::type ) \
 	{ return true; } \
-	template< typename T, typename ... R > \
+	template< typename T, typename SELF, typename ... R > \
 	typename std::enable_if \
 	< \
 		std::is_same \
@@ -126,7 +127,7 @@ T construct( );
 		>::value, \
 		decltype( NAME( construct< R >( ) ... ) ) \
 	>::type \
-	static call_static_function( const R & ...  r ) { return NAME( r ... ); }
+	static call_static_function( const R & ...  r ) { return SELF::NAME( r ... ); }
 #define DECLARE_TYPE( TYPE ) \
 	template< typename ... > \
 	constexpr static bool have_member_function( ... ) { return false; } \
@@ -137,6 +138,11 @@ T construct( );
 	template< typename ... > \
 	constexpr static bool have_static_variable( ... ) { return false; } \
 	static TYPE * get_this( )
+#define DECLARE_POSSIBLE( NAME ) \
+	DECLARE_POSSIBLE_MEMBER_FUNCTION( NAME ); \
+	DECLARE_POSSIBLE_MEMBER_VARIABLE( NAME ); \
+	DECLARE_POSSIBLE_STATIC_FUNCTION( NAME ); \
+	DECLARE_POSSIBLE_STATIC_VARIABLE( NAME )
 namespace misc
 {
 	using namespace boost::mpl::placeholders;
@@ -331,7 +337,7 @@ namespace misc
 	{
 		DECLARE_TYPE( test );
 		int data;
-		DECLARE_POSSIBLE_MEMBER_VARIABLE( data );
+		DECLARE_POSSIBLE( data );
 		DECLARE_POSSIBLE_MEMBER_VARIABLE( cache );
 		void func( int ) { }
 		DECLARE_POSSIBLE_MEMBER_FUNCTION( func );
@@ -363,7 +369,7 @@ namespace misc
 	struct static_function_return_type
 	{
 		typedef decltype(
-				TYPE::template call_static_function< NAME >(
+				TYPE::template call_static_function< NAME, TYPE >(
 					construct< ARG >( ) ... ) ) type;
 	};
 	template< typename TYPE, typename NAME, typename ... ARG >
