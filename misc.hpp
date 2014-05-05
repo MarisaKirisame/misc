@@ -29,6 +29,7 @@
 #include <iostream>
 #include <type_traits>
 #include <boost/preprocessor.hpp>
+#include <boost/preprocessor/seq/for_each.hpp>
 #define DECLARE_NAME( NAME ) struct NAME ## _tag{ }
 #define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
 #define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
@@ -102,7 +103,7 @@ T construct( );
 	>::type \
 	call_member_function( const R & ...  r ) { return NAME( r ... ); }
 #define DECLARE_POSSIBLE_STATIC_FUNCTION( NAME ) \
-	template< typename T, typename ... R > \
+	template< typename T, typename SELF, typename ... R > \
 	constexpr static bool have_static_function( \
 		typename std::enable_if \
 		< \
@@ -110,10 +111,11 @@ T construct( );
 			< \
 				T, \
 				NAME ## _tag \
-			>::value, \
+			>::value \
+			, \
 			typename std::add_pointer \
 			< \
-				decltype( NAME( construct< R >( ) ... ) ) \
+				decltype( SELF::NAME( construct< R >( ) ... ) ) \
 			>::type \
 		>::type ) \
 	{ return true; } \
@@ -125,7 +127,7 @@ T construct( );
 			T, \
 			NAME ## _tag \
 		>::value, \
-		decltype( NAME( construct< R >( ) ... ) ) \
+		decltype( SELF::NAME( construct< R >( ) ... ) ) \
 	>::type \
 	static call_static_function( const R & ...  r ) { return SELF::NAME( r ... ); }
 #define DECLARE_TYPE( TYPE ) \
@@ -136,13 +138,14 @@ T construct( );
 	template< typename ... > \
 	constexpr static bool have_member_variable( ... ) { return false; } \
 	template< typename ... > \
-	constexpr static bool have_static_variable( ... ) { return false; } \
-	static TYPE * get_this( )
+	constexpr static bool have_static_variable( ... ) { return false; }
 #define DECLARE_POSSIBLE( NAME ) \
 	DECLARE_POSSIBLE_MEMBER_FUNCTION( NAME ); \
 	DECLARE_POSSIBLE_MEMBER_VARIABLE( NAME ); \
 	DECLARE_POSSIBLE_STATIC_FUNCTION( NAME ); \
 	DECLARE_POSSIBLE_STATIC_VARIABLE( NAME )
+#define DECLARE_ALL_POSSIBLE_HELPER( R, DATA, ELEMENT ) DECLARE_POSSIBLE( ELEMENT );
+#define DECLARE_ALL_POSSIBLE( NAME_SEQ ) BOOST_PP_SEQ_FOR_EACH( DECLARE_ALL_POSSIBLE_HELPER, _, NAME_SEQ )
 namespace misc
 {
 	using namespace boost::mpl::placeholders;
@@ -337,16 +340,10 @@ namespace misc
 	{
 		DECLARE_TYPE( test );
 		int data;
-		DECLARE_POSSIBLE( data );
-		DECLARE_POSSIBLE_MEMBER_VARIABLE( cache );
+		DECLARE_ALL_POSSIBLE( (function)(data)(func)(foo)(cache) );
 		void func( int ) { }
-		DECLARE_POSSIBLE_MEMBER_FUNCTION( func );
 		static int function( );
-		DECLARE_POSSIBLE_STATIC_FUNCTION( function );
-		DECLARE_POSSIBLE_MEMBER_FUNCTION( foo );
-		DECLARE_POSSIBLE_STATIC_FUNCTION( foo );
 		static void * cache;
-		DECLARE_POSSIBLE_STATIC_VARIABLE( cache );
 	};
 	template< typename TYPE, typename NAME >
 	struct have_member_variable { static constexpr bool value = TYPE::template have_member_variable< NAME, TYPE >( nullptr ); };
@@ -373,7 +370,7 @@ namespace misc
 					construct< ARG >( ) ... ) ) type;
 	};
 	template< typename TYPE, typename NAME, typename ... ARG >
-	struct have_static_function { static constexpr bool value = TYPE::template have_static_function< NAME, ARG ... >( nullptr ); };
+	struct have_static_function { static constexpr bool value = TYPE::template have_static_function< NAME, TYPE, ARG ... >( nullptr ); };
 	static_assert( have_member_variable< test, data_tag >::value, "" );
 	static_assert( ! have_member_variable< test, cache_tag >::value, "" );
 	static_assert( std::is_same< member_variable_type< test, data_tag >::type, int >::value, "" );
