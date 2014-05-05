@@ -30,7 +30,10 @@
 #include <type_traits>
 #include <boost/preprocessor.hpp>
 #include <boost/preprocessor/seq/for_each.hpp>
+#define MISC_NAME_SEQ (data)(cache)(func)(function)(foo)
 #define DECLARE_NAME( NAME ) struct NAME ## _tag{ }
+#define DECLARE_NAMES_HELPER( R, DATA, ELEMENT ) DECLARE_NAME( ELEMENT );
+#define DECLARE_NAMES( NAME_SEQ ) BOOST_PP_SEQ_FOR_EACH( DECLARE_NAMES_HELPER, _, NAME_SEQ )
 #define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
 #define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
 #define DECLARE_POSSIBLE_MEMBER_VARIABLE( NAME ) \
@@ -130,7 +133,7 @@ T construct( );
 		decltype( SELF::NAME( construct< R >( ) ... ) ) \
 	>::type \
 	static call_static_function( const R & ...  r ) { return SELF::NAME( r ... ); }
-#define DECLARE_TYPE( TYPE ) \
+#define DECLARE_TYPE( TYPE, NAME_SEQ ) \
 	template< typename ... > \
 	constexpr static bool have_member_function( ... ) { return false; } \
 	template< typename ... > \
@@ -138,7 +141,8 @@ T construct( );
 	template< typename ... > \
 	constexpr static bool have_member_variable( ... ) { return false; } \
 	template< typename ... > \
-	constexpr static bool have_static_variable( ... ) { return false; }
+	constexpr static bool have_static_variable( ... ) { return false; } \
+	DECLARE_ALL_POSSIBLE( NAME_SEQ )
 #define DECLARE_POSSIBLE( NAME ) \
 	DECLARE_POSSIBLE_MEMBER_FUNCTION( NAME ); \
 	DECLARE_POSSIBLE_MEMBER_VARIABLE( NAME ); \
@@ -331,16 +335,11 @@ namespace misc
 	CPS< T > make_CPS( const T & t ) { return CPS< T >( t ); }
 	template< typename T >
 	CPS< T > make_CPS( T && t ) { return CPS< T >( std::move( t ) ); }
-	DECLARE_NAME( data );
-	DECLARE_NAME( cache );
-	DECLARE_NAME( func );
-	DECLARE_NAME( function );
-	DECLARE_NAME( foo );
+	DECLARE_NAMES( MISC_NAME_SEQ )
 	struct test
 	{
-		DECLARE_TYPE( test );
+		DECLARE_TYPE( test, MISC_NAME_SEQ );
 		int data;
-		DECLARE_ALL_POSSIBLE( (function)(data)(func)(foo)(cache) );
 		void func( int ) { }
 		static int function( );
 		static void * cache;
