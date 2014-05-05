@@ -26,6 +26,65 @@
 #include <boost/range/rbegin.hpp>
 #include <random>
 #include <boost/iterator/filter_iterator.hpp>
+#include <iostream>
+#include <type_traits>
+#include <functional>
+#define DECLARE_MEMBER_VARIABLE_NAME( NAME ) struct NAME ## _member_variable_tag{ }
+#define DECLARE_MEMBER_FUNCTION_NAME( NAME ) struct NAME ## _member_function_tag{ }
+#define DECLARE_NAME( NAME ) \
+DECLARE_MEMBER_VARIABLE_NAME( NAME ); \
+DECLARE_MEMBER_FUNCTION_NAME( NAME );
+#define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
+#define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
+#define DECLARE_MEMBER_VARIABLE( NAME ) \
+template< typename T > \
+constexpr static bool have_member_variable( \
+	typename std::enable_if \
+	< \
+		std::is_same< T, NAME ## _member_variable_tag >::value \
+	>::type * ) \
+{ return true; } \
+template< typename T > \
+static decltype( NAME ) get_member_variable( \
+	typename std::enable_if \
+	< \
+		std::is_same< T, NAME ## _member_variable_tag >::value \
+	>::type * )
+template< typename T >
+T construct( );
+#define DECLARE_MEMBER_FUNCTION( NAME ) \
+	template< typename T, typename ... R > \
+	constexpr static bool have_member_function( \
+		typename std::enable_if \
+		< \
+			std::is_same \
+			< \
+				T, \
+				NAME ## _member_function_tag \
+			>::value, \
+			typename std::add_pointer \
+			< \
+				decltype( get_this( )->NAME( construct< R >( ) ... ) ) \
+			>::type \
+		>::type ) \
+	{ return true; } \
+	template< typename T, typename ... R > \
+	typename std::enable_if \
+	< \
+		std::is_same \
+		< \
+			T, \
+			NAME ## _member_function_tag \
+		>::value, \
+		decltype( get_this( )->NAME( construct< R >( ) ... ) ) \
+	>::type \
+	call_function( const R & ...  r ) { return NAME( r ... ); }
+#define DECLARE_TYPE( TYPE ) \
+	template< typename ... > \
+	constexpr static bool have_member_function( ... ) { return false; } \
+	template< typename > \
+	constexpr static bool have_member_variable( ... ) { return false; } \
+	static TYPE * get_this( )
 namespace misc
 {
 	using namespace boost::mpl::placeholders;
@@ -54,8 +113,6 @@ namespace misc
 				boost::mpl::minus< _1, _2 >
 			>
 	{ };
-#define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
-#define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
 	DEFINE_DIVIDE_UNIT( length, time, velocity );
 	DEFINE_DIVIDE_UNIT( velocity, time, accleration );
 	DEFINE_MULTIPLY_UNIT( mass, accleration, force );
@@ -80,9 +137,8 @@ namespace misc
 		static boost::mpl::true_ SFINAE( t tt, typename boost::remove_reference< decltype( tt( construct< R >( )... ) ) >::type * = nullptr )
 		{ return boost::mpl::true_( ); }
 		static boost::mpl::false_ SFINAE( ... ) { return boost::mpl::false_( ); }
-		static constexpr bool value = decltype( SFINAE( construct< T >( ) ) )::value;
+		static constexpr bool value = SFINAE( construct< T >( ) ).value;
 	};
-
 	template< typename T1, typename T2, bool b1 = can_call< T1 >::value, bool b2 = can_call< T2 >::value >
 	struct expansion;
 	template< typename T1, typename T2 >
@@ -120,20 +176,17 @@ namespace misc
 		decltype( second( construct< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
 		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
-
 	template< typename T1, typename T2 >
 	expansion< T1, T2 > make_expansion( const T1 & t1, const T2 & t2 )
 	{
 		return expansion< T1, T2 >( t1, t2 );
 	}
-
 	struct non_returnable
 	{
 		non_returnable( non_returnable && ) = delete;
 		non_returnable( const non_returnable & ) = delete;
 		non_returnable( ) = delete;
 	};
-
 	template< typename T1, typename T2, bool b1 = can_call< T1 >::value, bool b2 = can_call< T2 >::value >
 	struct restriction;
 	template< typename T1, typename T2 >
@@ -217,5 +270,31 @@ namespace misc
 	CPS< T > make_CPS( const T & t ) { return CPS< T >( t ); }
 	template< typename T >
 	CPS< T > make_CPS( T && t ) { return CPS< T >( std::move( t ) ); }
+	DECLARE_MEMBER_VARIABLE_NAME( data );
+	DECLARE_MEMBER_VARIABLE_NAME( cache );
+	DECLARE_MEMBER_FUNCTION_NAME( func );
+	DECLARE_MEMBER_FUNCTION_NAME( function );
+	struct test
+	{
+		DECLARE_TYPE( test );
+		int data;
+		DECLARE_MEMBER_VARIABLE( data );
+		void func( int ) { }
+		DECLARE_MEMBER_FUNCTION( func );
+	};
+	template< typename TYPE, typename NAME >
+	struct have_member_variable { static constexpr bool value = TYPE::template have_member_variable< NAME >( nullptr ); };
+	template< typename TYPE, typename NAME >
+	struct member_variable_type { typedef decltype( TYPE::template get_member_variable< NAME >( nullptr ) ) type; };
+	template< typename TYPE, typename NAME, typename ... ARG >
+	struct have_member_function { static constexpr bool value = TYPE::template have_member_function< NAME, ARG ... >( nullptr ); };
+	template< typename TYPE, typename NAME, typename ... ARG >
+	struct member_function_return_type { typedef decltype( construct< TYPE * >( )->template call_function< NAME >( construct< ARG >( ) ... ) ) type; };
+	static_assert( have_member_variable< test, data_member_variable_tag >::value, "" );
+	static_assert( ! have_member_variable< test, cache_member_variable_tag >::value, "" );
+	static_assert( std::is_same< member_variable_type< test, data_member_variable_tag >::type, int >::value, "" );
+	static_assert( have_member_function< test, func_member_function_tag, long >::value, "" );
+	static_assert( ! have_member_function< test, func_member_function_tag, void * >::value, "" );
+	static_assert( std::is_same< member_function_return_type< test, func_member_function_tag, long >::type, void >::value, "" );
 }
 #endif //MISC_HPP
