@@ -34,6 +34,7 @@
 #include <boost/preprocessor.hpp>
 #include <boost/preprocessor/seq/for_each.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
+#include <is_empty_tuple.hpp>
 #define MISC_NAME_SEQ (data)(cache)(func)(function)(foo)(bar)
 #define DECLARE_NAME( NAME ) struct BOOST_PP_CAT( NAME, _tag ){ }
 #define DECLARE_NAMES_HELPER( R, DATA, ELEMENT ) DECLARE_NAME( ELEMENT );
@@ -173,6 +174,74 @@ T construct( );
 	DECLARE_POSSIBLE_STATIC_VARIABLE( NAME )
 #define DECLARE_ALL_POSSIBLE_HELPER( R, DATA, ELEMENT ) DECLARE_POSSIBLE( ELEMENT );
 #define DECLARE_ALL_POSSIBLE( NAME_SEQ ) BOOST_PP_SEQ_FOR_EACH( DECLARE_ALL_POSSIBLE_HELPER, _, NAME_SEQ )
+#define HAVE_MEMBER_VARIABLE( TYPE, NAME ) have_member_variable< TYPE, BOOST_PP_CAT( NAME, _tag ) >::value
+#define MEMBER_VARIABLE_TYPE( TYPE, NAME ) member_variable_type< TYPE, BOOST_PP_CAT( NAME, _tag ) >::type
+#define HAVE_STATIC_VARIABLE( TYPE, NAME ) have_static_variable< TYPE, BOOST_PP_CAT( NAME, _tag ) >::value
+#define STATIC_VARIABLE_TYPE( TYPE, NAME ) static_variable_type< TYPE, BOOST_PP_CAT( NAME, _tag ) >::type
+#define EXPAND_TUPLE_ARGUMENT_HELPER( R, DATA, ELEMENT ) , ELEMENT
+#define EAT_ARG( ... )
+#define EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
+	BOOST_PP_IIF( \
+		IS_EMPTY_TUPLE( ARGUMENT_TUPLE ), \
+		EAT_ARG, \
+		BOOST_PP_SEQ_FOR_EACH )\
+		( \
+				EXPAND_TUPLE_ARGUMENT_HELPER, \
+				_, \
+				BOOST_PP_TUPLE_TO_SEQ( ARGUMENT_TUPLE ) )
+#define HAVE_MEMBER_FUNCTION( TYPE, NAME, ARGUMENT_TUPLE ) \
+	have_member_function \
+	< \
+		TYPE, \
+		BOOST_PP_CAT( NAME, _tag ) \
+		EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
+	>::value
+#define MEMBER_FUNCTION_RETURN_TYPE( TYPE, NAME, ARGUMENT_TUPLE ) \
+	member_function_return_type \
+	< \
+		TYPE, \
+		BOOST_PP_CAT( NAME, _tag ) \
+		EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
+	>::type
+#define HAVE_STATIC_FUNCTION( TYPE, NAME, ARGUMENT_TUPLE ) \
+	have_static_function \
+	< \
+		TYPE, \
+		BOOST_PP_CAT( NAME, _tag ) \
+		EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
+	>::value
+#define STATIC_FUNCTION_RETURN_TYPE( TYPE, NAME, ARGUMENT_TUPLE ) \
+	static_function_return_type \
+	< \
+		TYPE, \
+		BOOST_PP_CAT( NAME, _tag ) \
+		EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
+	>::type
+#define DECLTYPE_HELPER( D, DATA, ELEMENT ) decltype( ELEMENT )
+#define CALL_STATIC_FUNCTION( TYPE, NAME, ARGUMENT_TUPLE ) \
+	call_static_function \
+	< \
+		TYPE, \
+		BOOST_PP_CAT( NAME, _tag ) \
+		EXPAND_TUPLE_ARGUMENT( \
+			BOOST_PP_SEQ_TO_TUPLE( \
+				BOOST_PP_SEQ_TRANSFORM( \
+					DECLTYPE_HELPER, \
+					_, \
+					BOOST_PP_TUPLE_TO_SEQ( ARGUMENT_TUPLE ) ) ) ) \
+	>::function( BOOST_PP_TUPLE_ENUM( ARGUMENT_TUPLE ) )
+#define CALL_MEMBER_FUNCTION( THIS, NAME, ARGUMENT_TUPLE ) \
+	call_member_function \
+	< \
+		std::remove_pointer< decltype( THIS ) >::type, \
+		BOOST_PP_CAT( NAME, _tag ) \
+		EXPAND_TUPLE_ARGUMENT( \
+			BOOST_PP_SEQ_TO_TUPLE( \
+				BOOST_PP_SEQ_TRANSFORM( \
+					DECLTYPE_HELPER, \
+					_, \
+					BOOST_PP_TUPLE_TO_SEQ( ARGUMENT_TUPLE ) ) ) ) \
+	>::function( THIS, BOOST_PP_TUPLE_ENUM( ARGUMENT_TUPLE ) )
 namespace misc
 {
 	using namespace boost::mpl::placeholders;
@@ -409,49 +478,7 @@ namespace misc
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct have_static_function { static constexpr bool value = TYPE::template have_static_function< NAME, TYPE, ARG ... >( nullptr ); };
 	template< typename TYPE, typename NAME >
-	struct have_static_function< TYPE, NAME, void > { static constexpr bool value = TYPE::template have_static_function< NAME, TYPE >( nullptr ); };
-#define HAVE_MEMBER_VARIABLE( TYPE, NAME ) have_member_variable< TYPE, BOOST_PP_CAT( NAME, _tag ) >::value
-#define MEMBER_VARIABLE_TYPE( TYPE, NAME ) member_variable_type< TYPE, BOOST_PP_CAT( NAME, _tag ) >::type
-#define HAVE_STATIC_VARIABLE( TYPE, NAME ) have_static_variable< TYPE, BOOST_PP_CAT( NAME, _tag ) >::value
-#define STATIC_VARIABLE_TYPE( TYPE, NAME ) static_variable_type< TYPE, BOOST_PP_CAT( NAME, _tag ) >::type
-	static_assert( HAVE_MEMBER_VARIABLE( test, data ), "" );
-	static_assert( ! HAVE_MEMBER_VARIABLE( test, cache ), "" );
-	static_assert( std::is_same< MEMBER_VARIABLE_TYPE( test, data ), int >::value, "" );
-#define EXPAND_TUPLE_ARGUMENT_HELPER( R, DATA, ELEMENT ) , ELEMENT
-#define EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
-	BOOST_PP_SEQ_FOR_EACH( \
-		EXPAND_TUPLE_ARGUMENT_HELPER, \
-		_, \
-		BOOST_PP_TUPLE_TO_SEQ( ARGUMENT_TUPLE ) )
-#define HAVE_MEMBER_FUNCTION( TYPE, NAME, ARGUMENT_TUPLE ) \
-	have_member_function \
-	< \
-		TYPE, \
-		BOOST_PP_CAT( NAME, _tag ) \
-		EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
-	>::value
-#define MEMBER_FUNCTION_RETURN_TYPE( TYPE, NAME, ARGUMENT_TUPLE ) \
-	member_function_return_type \
-	< \
-		TYPE, \
-		BOOST_PP_CAT( NAME, _tag ) \
-		EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
-	>::type
-#define HAVE_STATIC_FUNCTION( TYPE, NAME, ARGUMENT_TUPLE ) \
-	have_static_function \
-	< \
-		TYPE, \
-		BOOST_PP_CAT( NAME, _tag ) \
-		EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
-	>::value
-#define STATIC_FUNCTION_RETURN_TYPE( TYPE, NAME, ARGUMENT_TUPLE ) \
-	static_function_return_type \
-	< \
-		TYPE, \
-		BOOST_PP_CAT( NAME, _tag ) \
-		EXPAND_TUPLE_ARGUMENT( ARGUMENT_TUPLE ) \
-	>::type
-	template< typename TYPE, typename NAME, typename ... ARG >
+	struct have_static_function< TYPE, NAME, void > { static constexpr bool value = TYPE::template have_static_function< NAME, TYPE >( nullptr ); };	template< typename TYPE, typename NAME, typename ... ARG >
 	struct call_static_function
 	{
 		static decltype( TYPE::template call_static_function< NAME, TYPE >( construct< ARG >( ) ... ) )
@@ -465,31 +492,6 @@ namespace misc
 		function( )
 		{ return TYPE::template call_static_function< NAME, TYPE >( ); }
 	};
-#define DECLTYPE_HELPER( D, DATA, ELEMENT ) decltype( ELEMENT )
-#define CALL_STATIC_FUNCTION( TYPE, NAME, ARGUMENT_TUPLE ) \
-	call_static_function \
-	< \
-		TYPE, \
-		BOOST_PP_CAT( NAME, _tag ) \
-		EXPAND_TUPLE_ARGUMENT( \
-			BOOST_PP_SEQ_TO_TUPLE( \
-				BOOST_PP_SEQ_TRANSFORM( \
-					DECLTYPE_HELPER, \
-					_, \
-					BOOST_PP_TUPLE_TO_SEQ( ARGUMENT_TUPLE ) ) ) ) \
-	>::function( BOOST_PP_TUPLE_ENUM( ARGUMENT_TUPLE ) )
-#define CALL_MEMBER_FUNCTION( THIS, NAME, ARGUMENT_TUPLE ) \
-	call_member_function \
-	< \
-		std::remove_pointer< decltype( THIS ) >::type, \
-		BOOST_PP_CAT( NAME, _tag ) \
-		EXPAND_TUPLE_ARGUMENT( \
-			BOOST_PP_SEQ_TO_TUPLE( \
-				BOOST_PP_SEQ_TRANSFORM( \
-					DECLTYPE_HELPER, \
-					_, \
-					BOOST_PP_TUPLE_TO_SEQ( ARGUMENT_TUPLE ) ) ) ) \
-	>::function( THIS, BOOST_PP_TUPLE_ENUM( ARGUMENT_TUPLE ) )
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct call_member_function
 	{
@@ -508,11 +510,11 @@ namespace misc
 	static_assert( ! HAVE_MEMBER_FUNCTION( test, func, ( void * ) ), "" );
 	static_assert( std::is_same< MEMBER_FUNCTION_RETURN_TYPE( test, func, ( double ) ), double >::value, "" );
 	static_assert( ! HAVE_STATIC_FUNCTION( test, func, ( void ) ), "" );
-	static_assert( HAVE_STATIC_FUNCTION( test, function, ( void ) ), "" );
+	static_assert( HAVE_STATIC_FUNCTION( test, function, ( ) ), "" );
 	static_assert( ! HAVE_STATIC_FUNCTION( test, func, ( void ) ), "" );
 	static_assert( std::is_same< STATIC_FUNCTION_RETURN_TYPE( test, function, ( void ) ), int >::value, "" );
 	static_assert( ! HAVE_MEMBER_FUNCTION( test, foo, ( void ) ), "" );
-	static_assert( ! HAVE_STATIC_FUNCTION( test, foo, ( void ) ), "" );
+	static_assert( ! HAVE_STATIC_FUNCTION( test, foo, ( ) ), "" );
 	static_assert( HAVE_STATIC_VARIABLE( test, cache ), "" );
 	static_assert( ! HAVE_STATIC_VARIABLE( test, data ), "" );
 	static_assert( HAVE_STATIC_VARIABLE( test, cache ), "" );
@@ -530,5 +532,8 @@ namespace misc
 				decltype( CALL_MEMBER_FUNCTION( construct< test * >( ), func, ( 1 ) ) ),
 				double
 			>::value, "" );
+	static_assert( HAVE_MEMBER_VARIABLE( test, data ), "" );
+	static_assert( ! HAVE_MEMBER_VARIABLE( test, cache ), "" );
+	static_assert( std::is_same< MEMBER_VARIABLE_TYPE( test, data ), int >::value, "" );
 }
 #endif //MISC_HPP
