@@ -510,7 +510,7 @@ namespace misc
 		int data = 12450;
 		double func( int ) { return 0; }
 		static int function( ) { return 1; }
-		const static int cache = 10;
+		static int cache;
 		static decltype( & function ) bar( long, long time ) { if ( time == 0 ) { } return & function; }
 	};
 	template< typename TYPE, typename NAME >
