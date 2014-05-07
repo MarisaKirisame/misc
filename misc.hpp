@@ -180,7 +180,7 @@ constexpr static bool has_static_variable( \
 		>::value, \
 		decltype( construct< SELF * >( )->NAME( construct< R >( ) ... ) ) \
 	>::type \
-	call_member_function( SELF * t, const R & ...  r ) { return t->NAME( r ... ); }
+	call_member_function( const SELF & t, const R & ...  r ) { return t->NAME( r ... ); }
 #define DECLARE_POSSIBLE_STATIC_FUNCTION( NAME ) \
 	template< typename T, typename SELF, typename ... R > \
 	constexpr static bool has_static_function( \
@@ -296,11 +296,11 @@ constexpr static bool has_static_variable( \
 					DECLTYPE_HELPER, \
 					_, \
 					BOOST_PP_TUPLE_TO_SEQ( ARGUMENT_TUPLE ) ) ) ) \
-	>::function( BOOST_PP_TUPLE_ENUM( ARGUMENT_TUPLE ) )
-#define CALL_MEMBER_FUNCTION( THIS, NAME, ARGUMENT_TUPLE ) \
+	>( )( BOOST_PP_TUPLE_ENUM( ARGUMENT_TUPLE ) )
+#define CALL_MEMBER_FUNCTION( SELF, NAME, ARGUMENT_TUPLE ) \
 	call_member_function \
 	< \
-		std::remove_pointer< decltype( THIS ) >::type, \
+		decltype( SELF ), \
 		BOOST_PP_CAT( NAME, _tag ) \
 		EXPAND_TUPLE_ARGUMENT( \
 			BOOST_PP_SEQ_TO_TUPLE( \
@@ -308,7 +308,9 @@ constexpr static bool has_static_variable( \
 					DECLTYPE_HELPER, \
 					_, \
 					BOOST_PP_TUPLE_TO_SEQ( ARGUMENT_TUPLE ) ) ) ) \
-	>::function( THIS, BOOST_PP_TUPLE_ENUM( ARGUMENT_TUPLE ) )
+	>( )( SELF, BOOST_PP_TUPLE_ENUM( ARGUMENT_TUPLE ) )
+#define MEMBER_VARIABLE( SELF, NAME ) member_variable< decltype( SELF ), BOOST_PP_CAT( NAME, _tag ) >( )( SELF )
+#define STATIC_VARIABLE( TYPE, NAME ) static_variable< TYPE, BOOST_PP_CAT( NAME, _tag ) >( )( )
 namespace misc
 {
 	template< typename T, typename RET = void >
@@ -332,7 +334,8 @@ namespace misc
 			>
 	{ };
 	template< typename t1, typename t2 >
-	struct divide : boost::mpl::transform
+	struct divide :
+			boost::mpl::transform
 			<
 				t1,
 				t2,
@@ -421,7 +424,8 @@ namespace misc
 		T1 first;
 		T2 second;
 		template< typename ... R >
-		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type operator ( )( const R & ... r ) { return first( r ... ); }
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type
+		operator ( )( const R & ... r ) { return first( r ... ); }
 		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2 >
@@ -430,7 +434,8 @@ namespace misc
 		T1 first;
 		T2 second;
 		template< typename ... R >
-		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type operator ( )( const R & ... r ) { return first( r ... ); }
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type
+		operator ( )( const R & ... r ) { return first( r ... ); }
 		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2 >
@@ -440,7 +445,8 @@ namespace misc
 		T2 second;
 		decltype( construct< T1 >( )( ) ) operator ( )( ) { return first( ); }
 		template< typename ... R >
-		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type operator ( )( const R & ... r ) { return first( r ... ); }
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type
+		operator ( )( const R & ... r ) { return first( r ... ); }
 		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2 >
@@ -449,7 +455,8 @@ namespace misc
 		T1 first;
 		T2 second;
 		template< typename ... R >
-		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type operator ( )( const R & ... r ) { return first( r ... ); }
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type
+		operator ( )( const R & ... r ) { return first( r ... ); }
 		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2 >
@@ -503,7 +510,7 @@ namespace misc
 		int data = 12450;
 		double func( int ) { return 0; }
 		static int function( ) { return 1; }
-		static void * cache;
+		const static int cache = 10;
 		static decltype( & function ) bar( long, long time ) { if ( time == 0 ) { } return & function; }
 	};
 	template< typename TYPE, typename NAME >
@@ -511,13 +518,26 @@ namespace misc
 	template< typename TYPE, typename NAME >
 	struct member_variable_type { typedef decltype( construct< TYPE * >( )->template get_member_variable_return_type< NAME, TYPE >( ) ) type; };
 	template< typename TYPE, typename NAME >
+	struct member_variable
+	{
+		decltype( construct< TYPE * >( )->template get_member_variable< NAME, TYPE >( ) )
+		operator ( )( TYPE & t ) { return t.template get_member_variable< NAME, TYPE >( ); }
+	};
+	template< typename TYPE, typename NAME >
+	struct static_variable
+	{
+		decltype( TYPE::template get_static_variable< NAME, TYPE >( ) )
+		operator ( )( ) { return TYPE::template get_static_variable< NAME, TYPE >( ); }
+	};
+	template< typename TYPE, typename NAME >
 	struct has_static_variable { static constexpr bool value = TYPE::template has_static_variable< NAME, TYPE >( nullptr ); };
 	template< typename TYPE, typename NAME >
 	struct static_variable_type { typedef decltype( TYPE::template get_static_variable_return_type< NAME, TYPE >( ) ) type; };
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct has_member_function { static constexpr bool value = TYPE::template has_member_function< NAME, TYPE, ARG ... >( nullptr ); };
 	template< typename TYPE, typename NAME >
-	struct has_member_function< TYPE, NAME, void > { static constexpr bool value = TYPE::template has_member_function< NAME, TYPE >( nullptr ); };
+	struct has_member_function< TYPE, NAME, void >
+	{ static constexpr bool value = TYPE::template has_member_function< NAME, TYPE >( nullptr ); };
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct member_function_return_type
 	{
@@ -547,32 +567,34 @@ namespace misc
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct has_static_function { static constexpr bool value = TYPE::template has_static_function< NAME, TYPE, ARG ... >( nullptr ); };
 	template< typename TYPE, typename NAME >
-	struct has_static_function< TYPE, NAME, void > { static constexpr bool value = TYPE::template has_static_function< NAME, TYPE >( nullptr ); };	template< typename TYPE, typename NAME, typename ... ARG >
+	struct has_static_function< TYPE, NAME, void > { static constexpr bool value = TYPE::template has_static_function< NAME, TYPE >( nullptr ); };
+	template< typename TYPE, typename NAME, typename ... ARG >
 	struct call_static_function
 	{
-		static decltype( TYPE::template call_static_function< NAME, TYPE >( construct< ARG >( ) ... ) )
-		function( const ARG & ... r )
+		decltype( TYPE::template call_static_function< NAME, TYPE >( construct< ARG >( ) ... ) )
+		operator ( )( const ARG & ... r )
 		{ return TYPE::template call_static_function< NAME, TYPE >( r ... ); }
 	};
 	template< typename TYPE, typename NAME >
 	struct call_static_function< TYPE, NAME, void >
 	{
-		static decltype( TYPE::template call_static_function< NAME, TYPE >( ) )
-		function( )
+		decltype( TYPE::template call_static_function< NAME, TYPE >( ) )
+		operator ( )( )
 		{ return TYPE::template call_static_function< NAME, TYPE >( ); }
 	};
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct call_member_function
 	{
-		static decltype( TYPE::template call_member_function< NAME, TYPE >( construct< typename std::add_pointer< TYPE >::type >( ), construct< ARG >( ) ... ) )
-		function( TYPE * t,const ARG & ... r )
+		decltype(
+				TYPE::template call_member_function< NAME, TYPE >( construct < TYPE >( ), construct< ARG >( ) ... ) )
+		operator ( )( const TYPE & t,const ARG & ... r )
 		{ return TYPE::template call_member_function< NAME, TYPE >( t, r ... ); }
 	};
 	template< typename TYPE, typename NAME >
 	struct call_member_function< TYPE, NAME, void >
 	{
-		static decltype( TYPE::template call_member_function< NAME, TYPE >( ) )
-		function( TYPE * t )
+		decltype( TYPE::template call_member_function< NAME, TYPE >( ) )
+		operator ( )( const TYPE & t )
 		{ return TYPE::template call_member_function< NAME, TYPE >( t ); }
 	};
 	static_assert( HAS_MEMBER_FUNCTION( test, func, ( long ) ), "" );
@@ -587,7 +609,7 @@ namespace misc
 	static_assert( HAS_STATIC_VARIABLE( test, cache ), "" );
 	static_assert( ! HAS_STATIC_VARIABLE( test, data ), "" );
 	static_assert( HAS_STATIC_VARIABLE( test, cache ), "" );
-	static_assert( std::is_same< STATIC_VARIABLE_TYPE( test, cache ), void * >::value, "" );
+	static_assert( std::is_same< STATIC_VARIABLE_TYPE( test, cache ), int >::value, "" );
 	static_assert( HAS_STATIC_FUNCTION( test, bar, ( int, int ) ), "" );
 	static_assert(
 			std::is_same
@@ -598,7 +620,7 @@ namespace misc
 	static_assert(
 			std::is_same
 			<
-				decltype( CALL_MEMBER_FUNCTION( construct< test * >( ), func, ( 1 ) ) ),
+				decltype( CALL_MEMBER_FUNCTION( construct< test >( ), func, ( 1 ) ) ),
 				double
 			>::value, "" );
 	static_assert( HAS_MEMBER_VARIABLE( test, data ), "" );
