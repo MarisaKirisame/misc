@@ -56,6 +56,22 @@ constexpr static bool has_member_variable( \
 	>::type * ) \
 	{ return true; } \
 	template< typename T, typename SELF > \
+	typename std::add_lvalue_reference \
+	< \
+		typename enable_if_valid \
+		< \
+			typename std::enable_if \
+			< \
+				std::is_same \
+				< \
+					T, \
+					BOOST_PP_CAT( NAME, _tag ) \
+				>::value \
+			>::type, \
+			decltype( construct< SELF * >( )->NAME ) \
+		>::type \
+	>::type get_member_variable( ) { return static_cast< SELF * >( this )->NAME; } \
+	template< typename T, typename SELF > \
 	typename enable_if_valid \
 	< \
 		typename std::enable_if \
@@ -67,7 +83,7 @@ constexpr static bool has_member_variable( \
 			>::value \
 		>::type, \
 		decltype( construct< SELF * >( )->NAME ) \
-	>::type get_member_variable( ) { return static_cast< SELF * >( this )->NAME; } \
+	>::type get_member_variable_return_type( ) { return static_cast< SELF * >( this )->NAME; } \
 	template< typename T, typename SELF, typename K > \
 	typename std::enable_if \
 	< \
@@ -77,7 +93,10 @@ constexpr static bool has_member_variable( \
 			BOOST_PP_CAT( NAME, _tag ) \
 		>::value && has_member_variable< T, SELF >( nullptr ), \
 	typename enable_if_valid< decltype( construct< SELF * >( )->NAME ) >::type \
-	>::type invoke_member_variable( const K & k ) { k( static_cast< SELF * >( this )->NAME ); }
+	>::type invoke_member_variable( const K & k ) \
+	{ \
+		k( BOOST_PP_CAT( NAME, _tag )( ), static_cast< SELF * >( this )->NAME ); \
+	}
 #define DECLARE_POSSIBLE_STATIC_VARIABLE( NAME ) \
 template< typename T, typename SELF > \
 constexpr static bool has_static_variable( \
@@ -92,7 +111,25 @@ constexpr static bool has_static_variable( \
 	>::type * ) \
 	{ return true; } \
 	template< typename T, typename SELF > \
-	static typename enable_if_valid \
+	static typename \
+	std::add_lvalue_reference \
+	< \
+		typename enable_if_valid \
+		< \
+			typename std::enable_if \
+			< \
+				std::is_same \
+				< \
+					T, \
+					BOOST_PP_CAT( NAME, _tag ) \
+				>::value \
+			>::type, \
+			decltype( SELF::NAME ) \
+		>::type \
+	>::type get_static_variable( ) { return SELF::NAME; } \
+	template< typename T, typename SELF > \
+	static typename \
+	enable_if_valid \
 	< \
 		typename std::enable_if \
 		< \
@@ -103,7 +140,8 @@ constexpr static bool has_static_variable( \
 			>::value \
 		>::type, \
 		decltype( SELF::NAME ) \
-	>::type get_static_variable( ) { return SELF::NAME; }
+	>::type get_static_variable_return_type( );
+
 #define DECLARE_POSSIBLE_MEMBER_FUNCTION( NAME ) \
 	template< typename T, typename SELF, typename ... R > \
 	constexpr static bool has_member_function( \
@@ -471,11 +509,11 @@ namespace misc
 	template< typename TYPE, typename NAME >
 	struct has_member_variable { static constexpr bool value = TYPE::template has_member_variable< NAME, TYPE >( nullptr ); };
 	template< typename TYPE, typename NAME >
-	struct member_variable_type { typedef decltype( construct< TYPE * >( )->template get_member_variable< NAME, TYPE >( ) ) type; };
+	struct member_variable_type { typedef decltype( construct< TYPE * >( )->template get_member_variable_return_type< NAME, TYPE >( ) ) type; };
 	template< typename TYPE, typename NAME >
 	struct has_static_variable { static constexpr bool value = TYPE::template has_static_variable< NAME, TYPE >( nullptr ); };
 	template< typename TYPE, typename NAME >
-	struct static_variable_type { typedef decltype( TYPE::template get_static_variable< NAME, TYPE >( ) ) type; };
+	struct static_variable_type { typedef decltype( TYPE::template get_static_variable_return_type< NAME, TYPE >( ) ) type; };
 	template< typename TYPE, typename NAME, typename ... ARG >
 	struct has_member_function { static constexpr bool value = TYPE::template has_member_function< NAME, TYPE, ARG ... >( nullptr ); };
 	template< typename TYPE, typename NAME >
@@ -566,5 +604,6 @@ namespace misc
 	static_assert( HAS_MEMBER_VARIABLE( test, data ), "" );
 	static_assert( ! HAS_MEMBER_VARIABLE( test, cache ), "" );
 	static_assert( std::is_same< MEMBER_VARIABLE_TYPE( test, data ), int >::value, "" );
+	struct ALL { ALL( ... ) { } };
 }
 #endif //MISC_HPP
