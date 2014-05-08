@@ -32,13 +32,10 @@
 #include <iostream>
 #include <type_traits>
 #include <boost/preprocessor.hpp>
-#include "is_empty_tuple.hpp"
 #define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
 #define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
 namespace misc
 {
-	template< typename T >
-	T construct( );
 	using namespace boost::mpl::placeholders;
 	typedef boost::mpl::vector_c< int, 1, 0, 0, 0, 0, 0, 0 > mass;
 	typedef boost::mpl::vector_c< int, 0, 1, 0, 0, 0, 0, 0 > time;
@@ -85,10 +82,10 @@ namespace misc
 	struct can_call
 	{
 		template< typename t >
-		static boost::mpl::true_ SFINAE( t tt, typename boost::remove_reference< decltype( tt( construct< R >( )... ) ) >::type * = nullptr )
+		static boost::mpl::true_ SFINAE( t tt, typename boost::remove_reference< decltype( tt( std::declval< R >( )... ) ) >::type * = nullptr )
 		{ return boost::mpl::true_( ); }
 		static boost::mpl::false_ SFINAE( ... ) { return boost::mpl::false_( ); }
-		static constexpr bool value = SFINAE( construct< T >( ) ).value;
+		static constexpr bool value = SFINAE( std::declval< T >( ) ).value;
 	};
 	template< typename T1, typename T2, bool b1 = can_call< T1 >::value, bool b2 = can_call< T2 >::value >
 	struct expansion;
@@ -98,9 +95,9 @@ namespace misc
 		T1 first;
 		T2 second;
 		template< typename T, typename ... R >
-		decltype( first( construct< T >( ), construct< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
 		template< typename ... R >
-		decltype( second( construct< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
 		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2 >
@@ -108,11 +105,11 @@ namespace misc
 	{
 		T1 first;
 		T2 second;
-		decltype( construct< T2 >( )( ) ) operator ( )( ) { return second( ); }
+		decltype( std::declval< T2 >( )( ) ) operator ( )( ) { return second( ); }
 		template< typename T, typename ... R >
-		decltype( first( construct< T >( ), construct< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
 		template< typename ... R >
-		decltype( second( construct< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
 		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2, bool b >
@@ -120,11 +117,11 @@ namespace misc
 	{
 		T1 first;
 		T2 second;
-		decltype( construct< T1 >( )( ) ) operator ( )( ) { return first( ); }
+		decltype( std::declval< T1 >( )( ) ) operator ( )( ) { return first( ); }
 		template< typename T, typename ... R >
-		decltype( first( construct< T >( ), construct< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
 		template< typename ... R >
-		decltype( second( construct< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
 		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2 >
@@ -146,7 +143,7 @@ namespace misc
 		T1 first;
 		T2 second;
 		template< typename ... R >
-		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( std::declval< R >( )... ) ) >::type
 		operator ( )( const R & ... r ) { return first( r ... ); }
 		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
@@ -156,7 +153,7 @@ namespace misc
 		T1 first;
 		T2 second;
 		template< typename ... R >
-		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( std::declval< R >( )... ) ) >::type
 		operator ( )( const R & ... r ) { return first( r ... ); }
 		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
@@ -165,9 +162,9 @@ namespace misc
 	{
 		T1 first;
 		T2 second;
-		decltype( construct< T1 >( )( ) ) operator ( )( ) { return first( ); }
+		decltype( std::declval< T1 >( )( ) ) operator ( )( ) { return first( ); }
 		template< typename ... R >
-		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( std::declval< R >( )... ) ) >::type
 		operator ( )( const R & ... r ) { return first( r ... ); }
 		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
@@ -177,7 +174,7 @@ namespace misc
 		T1 first;
 		T2 second;
 		template< typename ... R >
-		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( construct< R >( )... ) ) >::type
+		typename boost::mpl::if_< can_call< T2, R ... >, non_returnable, decltype( first( std::declval< R >( )... ) ) >::type
 		operator ( )( const R & ... r ) { return first( r ... ); }
 		restriction( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
