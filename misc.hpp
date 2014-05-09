@@ -82,10 +82,10 @@ namespace misc
 	struct can_call
 	{
 		template< typename t >
-		static boost::mpl::true_ SFINAE( t tt, typename boost::remove_reference< decltype( tt( std::declval< R >( )... ) ) >::type * = nullptr )
+		static constexpr boost::mpl::true_ SFINAE( t tt, typename boost::remove_reference< decltype( tt( std::declval< R >( )... ) ) >::type * = nullptr )
 		{ return boost::mpl::true_( ); }
-		static boost::mpl::false_ SFINAE( ... ) { return boost::mpl::false_( ); }
-		static constexpr bool value = SFINAE( std::declval< T >( ) ).value;
+		static constexpr boost::mpl::false_ SFINAE( ... ) { return boost::mpl::false_( ); }
+		static constexpr bool value = decltype( SFINAE( std::declval< T >( ) ) )::value;
 	};
 	template< typename T1, typename T2, bool b1 = can_call< T1 >::value, bool b2 = can_call< T2 >::value >
 	struct expansion;
