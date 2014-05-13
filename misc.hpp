@@ -82,7 +82,7 @@ namespace misc
 	struct can_call
 	{
 		template< typename t >
-		static constexpr boost::mpl::true_ SFINAE( t tt, typename boost::remove_reference< decltype( tt( std::declval< R >( )... ) ) >::type * = nullptr )
+		static constexpr boost::mpl::true_ SFINAE( t, typename boost::remove_reference< decltype( std::declval< t >( )( std::declval< R >( )... ) ) >::type * = nullptr )
 		{ return boost::mpl::true_( ); }
 		static constexpr boost::mpl::false_ SFINAE( ... ) { return boost::mpl::false_( ); }
 		static constexpr bool value = decltype( SFINAE( std::declval< T >( ) ) )::value;
@@ -95,9 +95,9 @@ namespace misc
 		T1 first;
 		T2 second;
 		template< typename T, typename ... R >
-		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) const { return first( t, r ... ); }
 		template< typename ... R >
-		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) const { return second( r ... ); }
 		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2 >
@@ -105,11 +105,11 @@ namespace misc
 	{
 		T1 first;
 		T2 second;
-		decltype( std::declval< T2 >( )( ) ) operator ( )( ) { return second( ); }
+		decltype( std::declval< T2 >( )( ) ) operator ( )( ) const { return second( ); }
 		template< typename T, typename ... R >
-		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) const { return first( t, r ... ); }
 		template< typename ... R >
-		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) const { return second( r ... ); }
 		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2, bool b >
@@ -117,11 +117,11 @@ namespace misc
 	{
 		T1 first;
 		T2 second;
-		decltype( std::declval< T1 >( )( ) ) operator ( )( ) { return first( ); }
+		decltype( std::declval< T1 >( )( ) ) operator ( )( ) const { return first( ); }
 		template< typename T, typename ... R >
-		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) { return first( t, r ... ); }
+		decltype( first( std::declval< T >( ), std::declval< R >( )... ) ) operator ( )( const T & t, const R & ... r ) const { return first( t, r ... ); }
 		template< typename ... R >
-		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) { return second( r ... ); }
+		decltype( second( std::declval< R >( )... ) ) operator ( )( const R & ... r ) const { return second( r ... ); }
 		expansion( const T1 & t1, const T2 & t2 ) : first( t1 ), second( t2 ) { }
 	};
 	template< typename T1, typename T2 >
