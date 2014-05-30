@@ -1,16 +1,16 @@
 #ifndef MISC_HPP
 #define MISC_HPP
+#include <boost/mpl/bind.hpp>
+#include <array>
+#include <algorithm>
 #include <boost/mpl/size.hpp>
 #include <boost/mpl/vector.hpp>
-#include <iterator>
 #include <boost/mpl/bool.hpp>
 #include <boost/mpl/same_as.hpp>
 #include <boost/mpl/placeholders.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/type_traits/remove_reference.hpp>
-#include <array>
 #include <cmath>
-#include <algorithm>
 #include <iostream>
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/range/join.hpp>
@@ -30,6 +30,7 @@
 #include <random>
 #include <boost/iterator/filter_iterator.hpp>
 #include <iostream>
+#include <iterator>
 #include <type_traits>
 #include <boost/preprocessor.hpp>
 #include <algorithm>
@@ -391,7 +392,7 @@ namespace misc
 	}
 	void example( )
 	{
-		assert( is_palindrome( "amanaplanacanoepastaherosrajahsacoloraturamapssnipepercalemacaroniagagabananabagatanatagabananabagagainoracamelacrepepinsspamarutarolocashajarsorehatsapeonacanalpanama" ) );
+		assert( is_palindrome( "amanaplanacatacanalpanama" ) );
 		assert( ! is_palindrome( "this is not a palindrome" ) );
 		std::set< std::string > * ptr = nullptr;
 		std::thread t( display, & ptr );
@@ -402,195 +403,343 @@ namespace misc
 			while ( ptr != nullptr ) { std::this_thread::yield( ); }
 		}
 	}
+	template< bool ... >
+	struct assert_bool;
+	template< >
+	struct assert_bool< >
+	{
+		template< bool b >
+		struct apply{ typedef apply type; };
+	};
+	template< bool T >
+	struct assert_bool< T >
+	{
+		template< bool b >
+		struct apply
+		{
+			static_assert( b == T, "" );
+			typedef apply type;
+		};
+	};
 	template< typename T >
 	constexpr const T & max( const T & a, const T & b ) { return a > b ? a : b; }
 	template< typename T, typename ... ARG >
 	constexpr const T & max( const T & a, const T & b, const ARG & ... c ) { return a > b ? max( a, c ... ) : max( b, c ... ); }
-	#include <cassert>
-	#include <algorithm>
-	#include <type_traits>
-	#include <tuple>
-	template< int placeholder >
-	struct place_holder{ };
-	template< typename K, typename ... RES >
-	struct binded_function
+	template< size_t >
+	struct variable { };
+	template< typename lhs, typename rhs >
+	struct addition
+	{ typedef addition< lhs, rhs > type; };
+	template< size_t v >
+	struct constant
 	{
-		template< typename ... >
-		struct GET_LEAST_NUM_ARG
-		{ static constexpr size_t value = 0; };
-		template< typename T, typename ... ARG >
-		struct GET_LEAST_NUM_ARG< T, ARG ... >
-		{ static constexpr size_t value = GET_LEAST_NUM_ARG< ARG ... >::value; };
-		template< size_t T, typename ... ARG >
-		struct GET_LEAST_NUM_ARG< place_holder< T >, ARG ... >
-		{ static constexpr size_t value = max( T, GET_LEAST_NUM_ARG< ARG ... >::value ); };
-		static constexpr size_t LEAST_NUM_ARG = GET_LEAST_NUM_ARG< RES ... >::value;
-		K k;
-		struct tag{ };
-		template< typename NNEXT, size_t pos >
-		struct parameter_delegate
-		{
-			typedef NNEXT NEXT;
-			template< typename ... BEFORE >
-			struct wrapper
-			{
-				template< typename ... ORIGINAL >
-				struct wrapper2
-				{
-					template< typename SFINAE, typename ... REMAINING >
-					static auto function(
-							const binded_function * that,
-							const parameter_delegate * pd,
-							const BEFORE & ... before,
-							const typename std::enable_if< ! std::is_same< void, typename SFINAE::NEXT >::value, tag >::type & t,
-							const ORIGINAL & ... original,
-							const tag &,
-							const REMAINING & ... rem )
-					{
-						return std::decay< decltype( * pd->next ) >::type::
-								template wrapper< BEFORE ..., std::tuple_element< pos, std::tuple< ORIGINAL ... > >::type >::
-								template wrapper2< ORIGINAL ... >::template function< typename SFINAE::NEXT >(
-									that, pd->next, before ..., std::get< pos >( std::tie( original ... ) ), t, original ..., t, rem ... ); }
-					template< typename SFINAE, typename ... REMAINING >
-					static auto function(
-							const binded_function * that,
-							const parameter_delegate *,
-							const BEFORE & ... before,
-							const typename std::enable_if< std::is_same< void, typename SFINAE::NEXT >::value, tag >::type &,
-							const ORIGINAL & ... original,
-							const tag &,
-							const REMAINING & ... rem )
-					{ return that->k( before ..., std::get< pos >( std::tie( original ... ) ), rem ... ); }
-				};
-			};
-			NEXT * next;
-			~parameter_delegate( ) { clean_if_necessary< NEXT >( ); }
-			template< typename SFINAE >
-			typename std::enable_if< ! std::is_same< void, SFINAE >::value >::type clean_if_necessary( ) { delete next; }
-			template< typename SFINAE >
-			typename std::enable_if< std::is_same< void, SFINAE >::value >::type clean_if_necessary( ) { }
-			template< typename SFINAE, typename ... ARG  >
-			typename std::enable_if< ! std::is_same< void, SFINAE >::value >::type new_if_necessary( const ARG & ... arg ) { next = new NEXT( arg ... ); }
-			template< typename SFINAE, typename ... ARG >
-			typename std::enable_if< std::is_same< void, SFINAE >::value >::type new_if_necessary( const ARG & ... ) { }
-			template< typename ... ARG >
-			parameter_delegate( const ARG & ... arg ) { new_if_necessary< NEXT >( arg ... ); }
-		};
-		template< typename NNEXT, typename T >
-		struct constant_delegate
-		{
-			typedef NNEXT NEXT;
-			T value;
-			NEXT * next;
-			template< typename ... BEFORE >
-			struct wrapper
-			{
-				template< typename ... ORIGINAL >
-				struct wrapper2
-				{
-					template< typename SFINAE, typename ... REMAINING >
-					static auto function(
-							const binded_function * that,
-							const constant_delegate * cd,
-							const BEFORE & ... before,
-							const typename std::enable_if< ! std::is_same< void, typename SFINAE::NEXT >::value, tag >::type & t,
-							const ORIGINAL & ... original,
-							const tag &,
-							const REMAINING & ... rem )
-					{ return std::decay< decltype( * cd->next ) >::type::
-								template wrapper< BEFORE ..., T >::template wrapper2< ORIGINAL ... >::template function< typename SFINAE::NEXT >(
-									that, cd->next, before ..., cd->value, t, original ..., t, rem ... ); }
-					template< typename SFINAE, typename ... REMAINING >
-					static auto function(
-							const binded_function * that,
-							const constant_delegate * cd,
-							const BEFORE & ... before,
-							const typename std::enable_if< std::is_same< void, typename SFINAE::NEXT >::value, tag >::type &,
-							const ORIGINAL & ...,
-							const tag &,
-							const REMAINING & ... rem )
-					{ return that->k( before ..., cd->value, rem ... ); }
-				};
-			};
-			~constant_delegate( ) { clean_if_necessary< NEXT >( ); }
-			template< typename SFINAE >
-			typename std::enable_if< ! std::is_same< void, SFINAE >::value >::type clean_if_necessary( ) { delete next; }
-			template< typename SFINAE >
-			typename std::enable_if< std::is_same< void, SFINAE >::value >::type clean_if_necessary( ) { }
-			template< typename SFINAE, typename ... ARG  >
-			typename std::enable_if< ! std::is_same< void, SFINAE >::value >::type new_if_necessary( const ARG & ... arg ) { next = new NEXT( arg ... ); }
-			template< typename SFINAE, typename ... ARG >
-			typename std::enable_if< std::is_same< void, SFINAE >::value >::type new_if_necessary( const ARG & ... ) { }
-			template< typename F, typename ... ARG >
-			constant_delegate( const F & f, const ARG & ... arg ) : value( f ) { new_if_necessary< NEXT, ARG ... >( arg ... ); }
-			template< size_t F, typename ... ARG >
-			constant_delegate( const place_holder< F > &, const ARG & ... arg ) : constant_delegate( arg ... ) { }
-		};
-		template< typename ... >
-		struct GET_DELEGATE
-		{ typedef void type; };
-		template< typename T, typename ... ARG >
-		struct GET_DELEGATE< T, ARG ... >
-		{ typedef constant_delegate< typename GET_DELEGATE< ARG ... >::type, T > type; };
-		template< size_t T, typename ... ARG >
-		struct GET_DELEGATE< place_holder< T >, ARG ... >
-		{ typedef parameter_delegate< typename GET_DELEGATE< ARG ... >::type, T > type; };
-		typedef typename GET_DELEGATE< RES ... >::type DELEGATE;
-		DELEGATE d;
-		template< typename ... ARG >
-		struct operator_delegate
-		{
-			const binded_function * that;
-			std::tuple< const ARG & ... > data;
-			template< size_t NUM_ARG_EATENED, typename FIRST_REMAINING, typename ... REST_REMAINING >
-			auto function(
-					const ARG & ... bef,
-					const typename std::enable_if< NUM_ARG_EATENED != LEAST_NUM_ARG, FIRST_REMAINING >::type &,
-					const REST_REMAINING & ... rem ) const
-			{ return function< NUM_ARG_EATENED + 1, REST_REMAINING ... >( that, bef ..., rem ... ); }
-			template< size_t NUM_ARG_EATENED, typename FIRST_REMAINING, typename ... REST_REMAINING >
-			auto function(
-					const ARG & ... bef,
-					const typename std::enable_if< NUM_ARG_EATENED == LEAST_NUM_ARG, FIRST_REMAINING >::type &,
-					const REST_REMAINING & ... rem ) const
-			{ return second_function< ARG ... >::function( that, this, bef ..., rem ... ); }
-			template< typename ... BEFORE >
-			struct second_function
-			{
-				template< typename ... AFTER >
-				static auto function(
-						const binded_function * that,
-						const operator_delegate *,
-						const BEFORE & ... bef,
-						const AFTER & ... aft )
-				{ return DELEGATE::template wrapper< >::template wrapper2< BEFORE ... >::template function< DELEGATE >(
-								that, & that->d, tag( ), bef ..., tag( ), aft ... ); }
-			};
-			operator_delegate( const binded_function * that, const ARG & ... arg ) : that( that ), data( std::tie( arg ... ) ) { }
-			auto operator ( )( const ARG & ... arg ) const { return function< 0, ARG ... >( arg ..., arg ... ); }
-		};
-		template< typename ... ARG >
-		auto operator ( )( const ARG & ... arg ) const { return operator_delegate< ARG ... >( this, arg ... )( arg ... ); }
-		template< typename ... ARG >
-		binded_function( const K & k, const ARG & ... arg ) : k( k ), d( arg ... ) { }
+		typedef constant< v > type;
+		constexpr static size_t val = v;
 	};
-
-	template< typename T, typename ... ARG >
-	auto bind( const T & t, const ARG & ... arg ) { return binded_function< T, ARG ... >( t, arg ... ); }
-	#include <iostream>
-	struct max_s
+	template< size_t lhs, size_t rhs >
+	struct addition< constant< lhs >, constant< rhs > >
+	{ typedef typename constant< lhs + rhs >::type type; };
+	template< typename T >
+	struct addition< T, constant< 0 > > : T { };
+	template< >
+	struct addition< constant< 0 >, constant< 0 > > : constant< 0 > { };
+	template< typename T >
+	struct addition< constant< 0 >, T > : T { };
+	template< typename T >
+	struct negation { typedef negation< T > type; };
+	template< typename T >
+	struct negation< negation< T > > : T { };
+	template< typename lhs, typename rhs >
+	struct negation< addition< lhs, rhs > > :
+			addition
+			<
+				typename negation< lhs >::type,
+				typename negation< rhs >::type
+			>::type { };
+	template< typename T >
+	struct addition< T, negation< T > > : constant< 0 >::type { };
+	template< typename T >
+	struct addition< negation< T >, T > : constant< 0 >::type { };
+	template< typename lhs, typename rhs >
+	struct addition< lhs, addition< rhs, rhs > >
 	{
-		template< typename ... ARG >
-		auto operator ( )( const ARG & ... arg ) const { return max( arg ... ); }
+		typedef typename
+		std::conditional
+		<
+			! std::is_same
+			<
+				typename decltype( lhs( ) + rhs( ) )::type,
+				decltype( lhs( ) + rhs( ) )
+			>::value,
+			addition< typename addition< lhs, rhs >::type, rhs >,
+			addition< lhs, addition< rhs, rhs > >
+		>::type type;
 	};
-	void bound_example( )
+	template< typename lhs, typename rhs1, typename rhs2 >
+	struct addition< lhs, addition< rhs1, rhs2 > >
 	{
-		static_assert( max( 1, 2, 3, 4 ) == 4, "" );
-		static_assert( max( 1.0, 2.0 ) == 2.0, "" );
-		bind( [](int a,int b){ assert( a == 1 && b == 2 ); }, 1, place_holder< 0 >( ) )( 2 );
-		std::cout << max( 100, 2, 4 );
-		auto f = bind( max_s( ), 100, place_holder< 0 >( ) );
-		std::cout << f( 2, 3, 450 );
-	}
+		typedef typename
+		std::conditional
+		<
+			! std::is_same
+			<
+				typename decltype( lhs( ) + rhs1( ) )::type,
+				addition< lhs, rhs1 >
+			>::value,
+			typename addition< typename addition< lhs, rhs1 >::type, rhs2 >::type,
+			typename std::conditional
+			<
+				! std::is_same
+				<
+					typename decltype( lhs( ) + rhs2( ) )::type,
+					addition< lhs, rhs2 >
+				>::value,
+				typename addition< typename addition< lhs, rhs2 >::type, rhs1 >::type,
+				addition< lhs, typename addition< rhs1, rhs2 >::type >
+			>::type
+		>::type type;
+	};
+	template< typename lhs, typename rhs >
+	struct addition< constant< 0 >, addition< lhs, rhs > > : addition< lhs, rhs > { };
+	template< typename rhs >
+	struct addition< constant< 0 >, addition< rhs, rhs > > : addition< rhs, rhs > { };
+	template< size_t s >
+	struct addition< constant< s >, constant< 0 > > : constant< s >{ };
+	template< size_t s >
+	struct addition< constant< 0 >, constant< s > > : constant< s >{ };
+	template< >
+	struct negation< constant< 0 > > : constant< 0 > { };
+	template< typename lhs, typename rhs >
+	constexpr auto operator + ( const lhs &, const rhs & ) { return typename addition< lhs, rhs >::type( ); }
+	template< typename lhs, typename rhs >
+	constexpr auto operator - ( const lhs & l, const rhs & ) { return l + typename negation< rhs >::type( ); }
+	template< typename T >
+	struct reciprocal { };
+	template< typename lhs, typename rhs >
+	struct multiplication { typedef multiplication< lhs, rhs > type; };
+	template< typename T >
+	struct multiplication< T, constant< 0 > > { typedef constant< 0 > type; };
+	template< typename T >
+	struct multiplication< constant< 0 >, T > { typedef constant< 0 > type; };
+	template< typename T >
+	struct multiplication< constant< 1 >, T > { typedef T type; };
+	template< typename lhs, typename rhs1, typename rhs2 >
+	struct multiplication< lhs, addition< rhs1, rhs2 > > :
+			addition
+			<
+				typename multiplication< lhs, rhs1 >::type,
+				typename multiplication< lhs, rhs2 >::type
+			> { };
+	template< typename lhs, typename rhs1, typename rhs2 >
+	struct multiplication< addition< rhs1, rhs2 >, lhs > : multiplication< lhs, addition< rhs1, rhs2 > >::type { };
+	template< typename lhs, size_t rhs >
+	struct multiplication< constant< rhs >, lhs > : multiplication< lhs, constant< rhs > >::type { };
+	template< typename lhs, typename rhs >
+	constexpr auto operator * ( const lhs &, const rhs & ) { return typename multiplication< lhs, rhs >::type( ); }
+	template< typename lhs, typename rhs >
+	constexpr auto operator / ( const lhs & l, const rhs & ) { return l * reciprocal< rhs >( ); }
+	template< typename T >
+	constexpr bool can_decompose( const T & ) { return true; }
+	template< size_t s >
+	constexpr bool can_decompose( const constant< s > & ) { return false; }
+	template< typename T, typename V >
+	struct differentiate
+	{
+		static_assert( ! can_decompose( T( ) ), "" );
+		static_assert( ! can_decompose( V( ) ), "" );
+		typedef constant< 0 > type;
+	};
+	template< typename lhs, typename rhs, typename V >
+	struct differentiate< addition< lhs, rhs >, V >
+	{
+		typedef typename
+		addition
+		<
+			typename differentiate< lhs, V >::type,
+			typename differentiate< rhs, V >::type
+		>::type type;
+	};
+	template< typename T, typename V >
+	struct differentiate< negation< T >, V > { typedef typename negation< typename differentiate< T, V >::type >::type type; };
+	template< typename lhs, typename rhs, typename V >
+	struct differentiate< multiplication< lhs, rhs >, V >
+	{
+		typedef typename
+		addition
+		<
+			typename multiplication
+			<
+				typename differentiate< lhs, V >::type,
+				rhs
+			>::type,
+			typename multiplication
+			<
+				typename differentiate< rhs, V >::type,
+				lhs
+			>::type
+		>::type type;
+	};
+	template< typename T, typename V >
+	struct differentiate< reciprocal< T >, V >
+	{
+		typedef typename
+		negation
+		<
+			typename decltype(
+				typename differentiate< T, V >::type( ) /
+				( T( ) * T( ) ) )::type
+		>::type type;
+	};
+	template< typename T >
+	struct differentiate< T, T > { typedef constant< 1 >::type type; };
+	template< typename T >
+	constexpr bool has_reciprocal( const T & ) { return false; }
+	template< typename T >
+	struct remove_reciprocal_by_multiply_nonzero
+	{
+		typedef T type;
+	};
+	template< typename T, typename div >
+	struct get_remainder
+	{
+		typedef typename
+		std::conditional
+		<
+			std::is_same< T, div >::value,
+			constant< 0 >,
+			T
+		>::type type;
+	};
+	template< typename lhs, typename rhs, typename div >
+	struct get_remainder< addition< lhs, rhs >, div > :
+			addition
+			<
+				typename get_remainder< lhs, div >::type,
+				typename get_remainder< rhs, div >::type
+			> { };
+	template< typename lhs, typename rhs, typename div >
+	struct get_remainder< multiplication< lhs, rhs >, div > :
+			multiplication
+			<
+				typename get_remainder< lhs, div >::type,
+				typename get_remainder< rhs, div >::type
+			> { };
+	template< typename lhs, typename rhs >
+	struct get_remainder< multiplication< lhs, rhs >, lhs > : constant< 0 >{ };
+	template< typename lhs, typename rhs >
+	struct get_remainder< multiplication< lhs, rhs >, rhs > : constant< 0 >{ };
+	template< typename T >
+	struct get_remainder< multiplication< T, T >, T > : constant< 0 >{ };
+	template< typename T, typename div >
+	struct get_remainder< negation< T >, div > : negation< typename get_remainder< T, div >::type > { };
+	template< typename T, typename div >
+	struct get_modulant
+	{
+		typedef constant< 0 > type;
+	};
+	template< typename T >
+	struct get_variable { typedef T type; };
+	template< typename lhs, typename rhs >
+	struct get_variable< addition< lhs, rhs > >
+	{
+		typedef typename
+		std::conditional
+		<
+			has_variable( lhs( ) ),
+			typename get_variable< lhs >::type,
+			typename get_variable< rhs >::type
+		>::type type;
+	};
+	template< typename lhs, typename rhs >
+	struct get_variable< multiplication< lhs, rhs > >
+	{
+		typedef typename
+		std::conditional
+		<
+			has_variable( lhs( ) ),
+			typename get_variable< lhs >::type,
+			typename get_variable< rhs >::type
+		>::type type;
+	};
+	template< typename T >
+	constexpr bool has_variable( const T & ) { return true; }
+	template< size_t T >
+	constexpr bool has_variable( const constant< T > & ) { return false; }
+	template< typename T, typename assert >
+	struct is_zero;
+	template< size_t T, typename assert >
+	struct is_zero< constant< T >, assert > : boost::mpl::bool_< std::is_same< constant< T >, constant< 0 > >::value > { };
+	template< typename T, typename assert = assert_bool< > >
+	struct is_zero
+	{
+		template< bool b, typename TT, typename aassert > struct inner;
+		template< typename TT, typename aassert >
+		struct inner< true, TT, aassert >
+		{
+			typedef boost::mpl::false_ type;
+			typename assert::template apply< false >::type s;
+		};
+		template< typename TT, typename aassert >
+		struct inner< false, TT, aassert >
+		{
+			typedef
+			boost::mpl::bool_
+			<
+				is_zero< typename get_remainder< TT, typename get_variable< TT >::type >::type >::value &&
+				is_zero< typename get_modulant< TT, typename get_variable< TT >::type >::type >::value
+			> type;
+			typename assert::template apply< type::value >::type s;
+		};
+		typedef typename
+		std::conditional
+		<
+			has_reciprocal( T( ) ),
+			is_zero< typename remove_reciprocal_by_multiply_nonzero< T >::type >,
+			typename inner
+			<
+				std::is_same
+				<
+					T,
+					typename get_remainder< T, typename get_variable< T >::type >::type
+				>::value,
+				T,
+				assert
+			>::type
+		>::type type;
+		constexpr static bool value = type::value;
+	};
+	template< typename lhs, typename rhs, typename assert >
+	struct is_zero< multiplication< lhs, rhs >, assert > : boost::mpl::bool_< is_zero< lhs >::value || is_zero< rhs >::value > { };
+	template< typename T >
+	struct is_zero< negation< T > > : is_zero< T > { };
+	template< typename lhs, typename rhs, typename assert = assert_bool< > >
+	struct equal : is_zero< decltype( lhs( ) - rhs( ) ), assert > { };
+	template< typename lhs, typename rhs >
+	constexpr bool operator == ( const lhs &, const rhs & ) { return equal< typename lhs::type, typename rhs::type >::value; }
+	struct x { typedef x type; };
+	struct y { typedef y type; };
+	constexpr bool can_decompose( const x & ) { return false; }
+	constexpr bool can_decompose( const y & ) { return false; }
+	static_assert(
+			equal
+			<
+				typename differentiate< decltype( x( ) * x( ) + y( ) * y( ) ), x >::type,
+				decltype( constant< 2 >( ) * x( ) ),
+				assert_bool< true >
+			>::value, "" );
+	static_assert(
+			equal
+			<
+				decltype( x( ) * x( ) + x( ) * x( ) ),
+				decltype( constant< 2 >( ) * x( ) * x( ) ),
+				assert_bool< true >
+			>::value, "" );
+	static_assert(
+			equal
+			<
+				typename differentiate< decltype( constant< 3 >( ) * x( ) * x( ) * x( ) + constant< 2 >( ) * x( ) * x( ) ), x >::type,
+				decltype( constant< 9 >( ) * x( ) * x( ) + constant< 4 >( ) * x( ) ),
+				assert_bool< true >
+			>::value, "" );
 }
 #endif //MISC_HPP
