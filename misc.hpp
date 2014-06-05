@@ -1,5 +1,9 @@
 #ifndef MISC_HPP
 #define MISC_HPP
+#include <boost/range/adaptor/transformed.hpp>
+#include <boost/optional.hpp>
+#include <deque>
+#include <functional>
 #include <boost/mpl/bind.hpp>
 #include <array>
 #include <algorithm>
@@ -38,6 +42,8 @@
 #include <list>
 #include <iterator>
 #include <thread>
+#include <map>
+#include <boost/variant.hpp>
 #define DEFINE_MULTIPLY_UNIT( t1, t2, t3 ) typedef multiply< t1, t2 >::type t3
 #define DEFINE_DIVIDE_UNIT( t1, t2, t3 ) typedef divide< t1, t2 >::type t3
 namespace misc
@@ -403,343 +409,153 @@ namespace misc
 			while ( ptr != nullptr ) { std::this_thread::yield( ); }
 		}
 	}
-	template< bool ... >
-	struct assert_bool;
-	template< >
-	struct assert_bool< >
-	{
-		template< bool b >
-		struct apply{ typedef apply type; };
-	};
-	template< bool T >
-	struct assert_bool< T >
-	{
-		template< bool b >
-		struct apply
-		{
-			static_assert( b == T, "" );
-			typedef apply type;
-		};
-	};
 	template< typename T >
 	constexpr const T & max( const T & a, const T & b ) { return a > b ? a : b; }
 	template< typename T, typename ... ARG >
 	constexpr const T & max( const T & a, const T & b, const ARG & ... c ) { return a > b ? max( a, c ... ) : max( b, c ... ); }
-	template< size_t >
-	struct variable { };
-	template< typename lhs, typename rhs >
-	struct addition
-	{ typedef addition< lhs, rhs > type; };
-	template< size_t v >
-	struct constant
+	template< typename T, template< typename > class CONTAINER >
+	struct general_list
 	{
-		typedef constant< v > type;
-		constexpr static size_t val = v;
-	};
-	template< size_t lhs, size_t rhs >
-	struct addition< constant< lhs >, constant< rhs > >
-	{ typedef typename constant< lhs + rhs >::type type; };
-	template< typename T >
-	struct addition< T, constant< 0 > > : T { };
-	template< >
-	struct addition< constant< 0 >, constant< 0 > > : constant< 0 > { };
-	template< typename T >
-	struct addition< constant< 0 >, T > : T { };
-	template< typename T >
-	struct negation { typedef negation< T > type; };
-	template< typename T >
-	struct negation< negation< T > > : T { };
-	template< typename lhs, typename rhs >
-	struct negation< addition< lhs, rhs > > :
-			addition
-			<
-				typename negation< lhs >::type,
-				typename negation< rhs >::type
-			>::type { };
-	template< typename T >
-	struct addition< T, negation< T > > : constant< 0 >::type { };
-	template< typename T >
-	struct addition< negation< T >, T > : constant< 0 >::type { };
-	template< typename lhs, typename rhs >
-	struct addition< lhs, addition< rhs, rhs > >
-	{
-		typedef typename
-		std::conditional
-		<
-			! std::is_same
-			<
-				typename decltype( lhs( ) + rhs( ) )::type,
-				decltype( lhs( ) + rhs( ) )
-			>::value,
-			addition< typename addition< lhs, rhs >::type, rhs >,
-			addition< lhs, addition< rhs, rhs > >
-		>::type type;
-	};
-	template< typename lhs, typename rhs1, typename rhs2 >
-	struct addition< lhs, addition< rhs1, rhs2 > >
-	{
-		typedef typename
-		std::conditional
-		<
-			! std::is_same
-			<
-				typename decltype( lhs( ) + rhs1( ) )::type,
-				addition< lhs, rhs1 >
-			>::value,
-			typename addition< typename addition< lhs, rhs1 >::type, rhs2 >::type,
-			typename std::conditional
-			<
-				! std::is_same
-				<
-					typename decltype( lhs( ) + rhs2( ) )::type,
-					addition< lhs, rhs2 >
-				>::value,
-				typename addition< typename addition< lhs, rhs2 >::type, rhs1 >::type,
-				addition< lhs, typename addition< rhs1, rhs2 >::type >
-			>::type
-		>::type type;
-	};
-	template< typename lhs, typename rhs >
-	struct addition< constant< 0 >, addition< lhs, rhs > > : addition< lhs, rhs > { };
-	template< typename rhs >
-	struct addition< constant< 0 >, addition< rhs, rhs > > : addition< rhs, rhs > { };
-	template< size_t s >
-	struct addition< constant< s >, constant< 0 > > : constant< s >{ };
-	template< size_t s >
-	struct addition< constant< 0 >, constant< s > > : constant< s >{ };
-	template< >
-	struct negation< constant< 0 > > : constant< 0 > { };
-	template< typename lhs, typename rhs >
-	constexpr auto operator + ( const lhs &, const rhs & ) { return typename addition< lhs, rhs >::type( ); }
-	template< typename lhs, typename rhs >
-	constexpr auto operator - ( const lhs & l, const rhs & ) { return l + typename negation< rhs >::type( ); }
-	template< typename T >
-	struct reciprocal { };
-	template< typename lhs, typename rhs >
-	struct multiplication { typedef multiplication< lhs, rhs > type; };
-	template< typename T >
-	struct multiplication< T, constant< 0 > > { typedef constant< 0 > type; };
-	template< typename T >
-	struct multiplication< constant< 0 >, T > { typedef constant< 0 > type; };
-	template< typename T >
-	struct multiplication< constant< 1 >, T > { typedef T type; };
-	template< typename lhs, typename rhs1, typename rhs2 >
-	struct multiplication< lhs, addition< rhs1, rhs2 > > :
-			addition
-			<
-				typename multiplication< lhs, rhs1 >::type,
-				typename multiplication< lhs, rhs2 >::type
-			> { };
-	template< typename lhs, typename rhs1, typename rhs2 >
-	struct multiplication< addition< rhs1, rhs2 >, lhs > : multiplication< lhs, addition< rhs1, rhs2 > >::type { };
-	template< typename lhs, size_t rhs >
-	struct multiplication< constant< rhs >, lhs > : multiplication< lhs, constant< rhs > >::type { };
-	template< typename lhs, typename rhs >
-	constexpr auto operator * ( const lhs &, const rhs & ) { return typename multiplication< lhs, rhs >::type( ); }
-	template< typename lhs, typename rhs >
-	constexpr auto operator / ( const lhs & l, const rhs & ) { return l * reciprocal< rhs >( ); }
-	template< typename T >
-	constexpr bool can_decompose( const T & ) { return true; }
-	template< size_t s >
-	constexpr bool can_decompose( const constant< s > & ) { return false; }
-	template< typename T, typename V >
-	struct differentiate
-	{
-		static_assert( ! can_decompose( T( ) ), "" );
-		static_assert( ! can_decompose( V( ) ), "" );
-		typedef constant< 0 > type;
-	};
-	template< typename lhs, typename rhs, typename V >
-	struct differentiate< addition< lhs, rhs >, V >
-	{
-		typedef typename
-		addition
-		<
-			typename differentiate< lhs, V >::type,
-			typename differentiate< rhs, V >::type
-		>::type type;
-	};
-	template< typename T, typename V >
-	struct differentiate< negation< T >, V > { typedef typename negation< typename differentiate< T, V >::type >::type type; };
-	template< typename lhs, typename rhs, typename V >
-	struct differentiate< multiplication< lhs, rhs >, V >
-	{
-		typedef typename
-		addition
-		<
-			typename multiplication
-			<
-				typename differentiate< lhs, V >::type,
-				rhs
-			>::type,
-			typename multiplication
-			<
-				typename differentiate< rhs, V >::type,
-				lhs
-			>::type
-		>::type type;
-	};
-	template< typename T, typename V >
-	struct differentiate< reciprocal< T >, V >
-	{
-		typedef typename
-		negation
-		<
-			typename decltype(
-				typename differentiate< T, V >::type( ) /
-				( T( ) * T( ) ) )::type
-		>::type type;
+		typedef boost::variant< T, boost::recursive_wrapper< CONTAINER< T > > > type;
+		type element;
 	};
 	template< typename T >
-	struct differentiate< T, T > { typedef constant< 1 >::type type; };
-	template< typename T >
-	constexpr bool has_reciprocal( const T & ) { return false; }
-	template< typename T >
-	struct remove_reciprocal_by_multiply_nonzero
+	struct variable_proxy
 	{
-		typedef T type;
-	};
-	template< typename T, typename div >
-	struct get_remainder
-	{
-		typedef typename
-		std::conditional
-		<
-			std::is_same< T, div >::value,
-			constant< 0 >,
-			T
-		>::type type;
-	};
-	template< typename lhs, typename rhs, typename div >
-	struct get_remainder< addition< lhs, rhs >, div > :
-			addition
-			<
-				typename get_remainder< lhs, div >::type,
-				typename get_remainder< rhs, div >::type
-			> { };
-	template< typename lhs, typename rhs, typename div >
-	struct get_remainder< multiplication< lhs, rhs >, div > :
-			multiplication
-			<
-				typename get_remainder< lhs, div >::type,
-				typename get_remainder< rhs, div >::type
-			> { };
-	template< typename lhs, typename rhs >
-	struct get_remainder< multiplication< lhs, rhs >, lhs > : constant< 0 >{ };
-	template< typename lhs, typename rhs >
-	struct get_remainder< multiplication< lhs, rhs >, rhs > : constant< 0 >{ };
-	template< typename T >
-	struct get_remainder< multiplication< T, T >, T > : constant< 0 >{ };
-	template< typename T, typename div >
-	struct get_remainder< negation< T >, div > : negation< typename get_remainder< T, div >::type > { };
-	template< typename T, typename div >
-	struct get_modulant
-	{
-		typedef constant< 0 > type;
-	};
-	template< typename T >
-	struct get_variable { typedef T type; };
-	template< typename lhs, typename rhs >
-	struct get_variable< addition< lhs, rhs > >
-	{
-		typedef typename
-		std::conditional
-		<
-			has_variable( lhs( ) ),
-			typename get_variable< lhs >::type,
-			typename get_variable< rhs >::type
-		>::type type;
-	};
-	template< typename lhs, typename rhs >
-	struct get_variable< multiplication< lhs, rhs > >
-	{
-		typedef typename
-		std::conditional
-		<
-			has_variable( lhs( ) ),
-			typename get_variable< lhs >::type,
-			typename get_variable< rhs >::type
-		>::type type;
-	};
-	template< typename T >
-	constexpr bool has_variable( const T & ) { return true; }
-	template< size_t T >
-	constexpr bool has_variable( const constant< T > & ) { return false; }
-	template< typename T, typename assert >
-	struct is_zero;
-	template< size_t T, typename assert >
-	struct is_zero< constant< T >, assert > : boost::mpl::bool_< std::is_same< constant< T >, constant< 0 > >::value > { };
-	template< typename T, typename assert = assert_bool< > >
-	struct is_zero
-	{
-		template< bool b, typename TT, typename aassert > struct inner;
-		template< typename TT, typename aassert >
-		struct inner< true, TT, aassert >
+		mutable const variable_proxy * origin = this;
+		variable_proxy( const variable_proxy & v ) : origin( v.origin ) { }
+		variable_proxy( ) { }
+		bool is_original( ) const { return origin == this; }
+		const variable_proxy * get_origin( ) const
 		{
-			typedef boost::mpl::false_ type;
-			typename assert::template apply< false >::type s;
-		};
-		template< typename TT, typename aassert >
-		struct inner< false, TT, aassert >
+			while ( ! origin->is_original( ) )
+			{
+				origin->origin = origin->origin->origin;
+				origin = origin->origin;
+			}
+			return origin;
+		}
+		bool operator == ( const variable_proxy & v ) const { return get_origin( ) == v.get_origin( ); }
+		bool operator != ( const variable_proxy & v ) const { return get_origin( ) != v.get_origin( ); }
+		bool operator > ( const variable_proxy & v ) const { return get_origin( ) > v.get_origin( ); }
+		bool operator < ( const variable_proxy & v ) const { return get_origin( ) < v.get_origin( ); }
+		bool operator >= ( const variable_proxy & v ) const { return get_origin( ) >= v.get_origin( ); }
+		bool operator <= ( const variable_proxy & v ) const { return get_origin( ) <= v.get_origin( ); }
+		variable_proxy & operator = ( const variable_proxy & v )
 		{
-			typedef
-			boost::mpl::bool_
-			<
-				is_zero< typename get_remainder< TT, typename get_variable< TT >::type >::type >::value &&
-				is_zero< typename get_modulant< TT, typename get_variable< TT >::type >::type >::value
-			> type;
-			typename assert::template apply< type::value >::type s;
-		};
-		typedef typename
-		std::conditional
-		<
-			has_reciprocal( T( ) ),
-			is_zero< typename remove_reciprocal_by_multiply_nonzero< T >::type >,
-			typename inner
-			<
-				std::is_same
-				<
-					T,
-					typename get_remainder< T, typename get_variable< T >::type >::type
-				>::value,
-				T,
-				assert
-			>::type
-		>::type type;
-		constexpr static bool value = type::value;
+			origin = v.origin;
+			return * this;
+		}
 	};
-	template< typename lhs, typename rhs, typename assert >
-	struct is_zero< multiplication< lhs, rhs >, assert > : boost::mpl::bool_< is_zero< lhs >::value || is_zero< rhs >::value > { };
 	template< typename T >
-	struct is_zero< negation< T > > : is_zero< T > { };
-	template< typename lhs, typename rhs, typename assert = assert_bool< > >
-	struct equal : is_zero< decltype( lhs( ) - rhs( ) ), assert > { };
-	template< typename lhs, typename rhs >
-	constexpr bool operator == ( const lhs &, const rhs & ) { return equal< typename lhs::type, typename rhs::type >::value; }
-	struct x { typedef x type; };
-	struct y { typedef y type; };
-	constexpr bool can_decompose( const x & ) { return false; }
-	constexpr bool can_decompose( const y & ) { return false; }
-	static_assert(
-			equal
-			<
-				typename differentiate< decltype( x( ) * x( ) + y( ) * y( ) ), x >::type,
-				decltype( constant< 2 >( ) * x( ) ),
-				assert_bool< true >
-			>::value, "" );
-	static_assert(
-			equal
-			<
-				decltype( x( ) * x( ) + x( ) * x( ) ),
-				decltype( constant< 2 >( ) * x( ) * x( ) ),
-				assert_bool< true >
-			>::value, "" );
-	static_assert(
-			equal
-			<
-				typename differentiate< decltype( constant< 3 >( ) * x( ) * x( ) * x( ) + constant< 2 >( ) * x( ) * x( ) ), x >::type,
-				decltype( constant< 9 >( ) * x( ) * x( ) + constant< 4 >( ) * x( ) ),
-				assert_bool< true >
-			>::value, "" );
+	struct fresh_variable
+	{
+		size_t i;
+		fresh_variable( size_t i ) : i( i ) { }
+	};
+	template< typename T >
+	struct substitution
+	{
+		std::map< variable_proxy< T >, T > map;
+		auto find( const variable_proxy< T > & vp ) const { return map.find( vp ); }
+		auto begin( ) const { return map.begin( ); }
+		auto end( ) const { return map.end( ); }
+		auto fresh( ) const { return fresh_variable< T >( 0 ); }
+	};
+	template< typename T >
+	struct stream
+	{
+		struct stream_iterator : std::iterator< std::forward_iterator_tag, T >
+		{
+			struct type_erasure_base
+			{
+				virtual T get( ) const = 0;
+				virtual void advance( ) = 0;
+				virtual bool equal( const type_erasure_base & ) const = 0;
+				virtual ~type_erasure_base( ) { }
+			};
+			template< typename ITER >
+			struct type_erasure : type_erasure_base
+			{
+				ITER iter;
+				T get( ) const override { return * iter; }
+				void advance( ) override { ++iter; }
+				bool equal( const type_erasure_base & comp ) const override
+				{
+					if ( const type_erasure * const i = dynamic_cast< const type_erasure * const >( & comp ) )
+					{ return iter == i->iter; }
+					return false;
+				}
+				type_erasure( const ITER & iter ) : iter( iter ) { }
+			};
+			std::shared_ptr< type_erasure_base > internal;
+			T operator * ( ) const { return internal->get( ); }
+			stream_iterator & operator ++ ( )
+			{
+				internal->advance( );
+				return * this;
+			}
+			stream_iterator operator ++ ( int )
+			{
+				auto ret( * this );
+				internal->advance( );
+				return ret;
+			}
+			bool operator == ( const stream_iterator & si ) const { return internal->equal( * si.internal ); }
+			bool operator != ( const stream_iterator & si ) const { return ! internal->equal( * si.internal ); }
+			template< typename ITER >
+			stream_iterator( const ITER & i ) : internal( new type_erasure< ITER >( i ) ) { }
+		}b,e;
+		template< typename ITER >
+		stream( const ITER & b, const ITER & e ) : b( b ), e( e ) { }
+		stream_iterator begin( ) const { return b; }
+		stream_iterator end( ) const { return e; }
+		stream_iterator cbegin( ) const { return begin( ); }
+		stream_iterator cend( ) const { return end( ); }
+	};
+	template< typename T >
+	using goal = std::function< stream< substitution< T > >( substitution< T > ) >;
+	template< typename T >
+	struct empty_iterator
+	{
+		T operator * ( ) const { throw; }
+		bool operator == ( const empty_iterator & ) const { return true; }
+		bool operator != ( const empty_iterator & ) const { return false; }
+		empty_iterator & operator ++ ( ) { throw; }
+		empty_iterator operator ++ ( int ) { throw; }
+	};
+	template< typename T >
+	goal< T > faliure( )
+	{
+		return []( const substitution< T > & )
+		{ return stream< substitution< T > >( empty_iterator< substitution< T > >( ), empty_iterator< substitution< T > >( ) ); };
+	}
+	template< typename T >
+	goal< T > success( )
+	{
+		return []( const substitution< T > & )
+		{ return stream< substitution< T > >( empty_iterator< substitution< T > >( ), empty_iterator< substitution< T > >( ) ); };
+	}
+	template< typename T >
+	stream< boost::variant< T, fresh_variable< T > > > run( const variable_proxy< T > & val, const goal< T > & g )
+	{
+		stream< substitution< T > > res = g( substitution< T >( ) );
+		auto f = [=]( const substitution< T > & sub )
+		{
+			auto it = sub.find( val );
+			if ( it == sub.end( ) )
+			{ return boost::variant< T, fresh_variable< T > >( sub.fresh( ) ); }
+			else
+			{ return boost::variant< T, fresh_variable< T > >( it->second ); }
+		};
+		return stream< boost::variant< T, fresh_variable< T > > >(
+					boost::make_transform_iterator( res.begin( ), f ),
+					boost::make_transform_iterator( res.end( ), f ) );
+	}
+	void relational_example( )
+	{
+		typedef int T;
+		run( variable_proxy< T >( ), success< T >( ) );
+	}
 }
 #endif //MISC_HPP
