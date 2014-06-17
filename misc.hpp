@@ -33,7 +33,6 @@
 #include <boost/range/rbegin.hpp>
 #include <random>
 #include <boost/iterator/filter_iterator.hpp>
-#include <iostream>
 #include <iterator>
 #include <type_traits>
 #include <boost/preprocessor.hpp>
@@ -412,6 +411,218 @@ namespace misc
 	template< typename T >
 	constexpr const T & max( const T & a, const T & b ) { return a > b ? a : b; }
 	template< typename T, typename ... ARG >
-	constexpr const T & max( const T & a, const T & b, const ARG & ... c ) { return a > b ? max( a, c ... ) : max( b, c ... ); }
+	constexpr const T & max( const T & a, const T & b, const ARG & ... c ) { return a > b ? std::max( a, c ... ) : std::max( b, c ... ); }
+	enum class_name
+	{
+		calc_bc,
+		stat,
+		physic,
+		psych,
+		macro,
+		WH,
+		calc_ab,
+		ES,
+		HG
+	};
+
+	std::ostream & operator << ( std::ostream & os, class_name cn )
+	{
+		switch ( cn )
+		{
+			case psych:
+				os << "psych  ";
+				break;
+			case calc_ab:
+				os << "calc_ab";
+				break;
+			case calc_bc:
+				os << "calc_bc";
+				break;
+			case stat:
+				os << "stat   ";
+				break;
+			case physic:
+				os << "physic ";
+				break;
+			case macro:
+				os << "macro  ";
+				break;
+			case WH:
+				os << "WH     ";
+				break;
+			case ES:
+				os << "ES     ";
+				break;
+			case HG:
+				os << "HG     ";
+				break;
+		}
+		return os;
+	}
+	std::set< class_name > pair_class( )
+	{
+		return
+		{
+			calc_bc,
+			stat,
+			physic,
+			macro,
+			WH,
+			calc_ab,
+			ES,
+			HG
+		};
+	}
+	//physic and enviromental science cannot be std::pair
+	struct class_organization
+	{
+		std::set< std::pair< class_name, class_name > > paired_set;
+		static std::set< std::set< std::pair< class_name, class_name > > >  paired_set_out( const std::set< class_name > & rem )
+		{
+			if ( rem.size( ) == 2 )
+			{
+				auto b = rem.begin( );
+				class_name f = * b;
+				++b;
+				class_name e = * b;
+				std::set< std::set< std::pair< class_name, class_name > > > ret;
+				std::set< std::pair< class_name, class_name > > tem;
+				tem.insert( std::make_pair( f, e ) );
+				ret.insert( tem );
+				return ret;
+			}
+			assert( rem.size( ) % 2 == 0 );
+			assert( rem.begin( ) != rem.end( ) );
+			class_name f = *rem.begin( );
+			auto re = rem;
+			re.erase( f );
+			std::set< std::set< std::pair< class_name, class_name > > > ret;
+			for ( class_name i : re )
+			{
+				auto tem = re;
+				auto n = tem.erase( i );
+				assert( n > 0 );
+				std::set< std::set< std::pair< class_name, class_name > > > res(  paired_set_out( tem ) );
+				transform(
+							res.begin( ),
+							res.end( ),
+							inserter( ret, ret.end( ) ),
+							[&]( const std::set< std::pair< class_name, class_name > > & ii )
+				{
+					auto tem( ii );
+					tem.insert( std::make_pair( std::max( f, i ), std::min( f, i ) ) );
+					return tem;
+				} );
+			}
+			return ret;
+		}
+		static std::set< class_organization > all_class_organization( )
+		{
+			std::set< class_organization > ret;
+			auto res =  paired_set_out( pair_class( ) );
+			for ( auto i : res )
+			{
+				ret.insert( class_organization( i, 0 ) );
+				ret.insert( class_organization( i, 1 ) );
+				ret.insert( class_organization( i, 2 ) );
+				ret.insert( class_organization( i, 3 ) );
+			}
+			return ret;
+		}
+		size_t psy_position;
+		class_organization( const std::set< std::pair< class_name, class_name > > & ps, size_t s ) : paired_set( ps ), psy_position( s ) { }
+		static size_t get_conflict( class_name l, class_name r )
+		{
+			assert( l != r );
+			static std::map< std::pair< class_name, class_name >, size_t > conflict_map;
+			static auto t = [&]()
+			{
+				auto insert = [&]( class_name l, class_name r, size_t i ) { conflict_map.insert( std::make_pair( std::make_pair( std::min( l, r ), std::max( l, r ) ), i ) ); };
+				insert( calc_bc, stat, 4 );
+				insert( calc_bc, physic, 4 );
+				insert( calc_bc, psych, 2 );
+				insert( calc_bc, macro, 5 );
+				insert( calc_bc, WH, 4 );
+				insert( calc_bc, calc_ab, 0 );
+				insert( calc_bc, ES, 6 );
+				insert( calc_bc, HG, 2 );
+				insert( stat, physic, 1 );
+				insert( stat, psych, 3 );
+				insert( stat, macro, 9 );
+				insert( stat, WH, 7 );
+				insert( stat, calc_ab, 0 );
+				insert( stat, ES, 6 );
+				insert( stat, HG, 4 );
+				insert( physic, psych, 3 );
+				insert( physic, macro, 6 );
+				insert( physic, WH, 0 );
+				insert( physic, calc_ab, 1 );
+				insert( physic, ES, 4 );
+				insert( physic, HG, 1 );
+				insert( psych, macro, 7 );
+				insert( psych, WH, 3 );
+				insert( psych, calc_ab, 5 );
+				insert( psych, ES, 4 );
+				insert( psych, HG, 8 );
+				insert( macro, WH, 8 );
+				insert( macro, calc_ab, 11 );
+				insert( macro, ES, 11 );
+				insert( macro, HG, 14 );
+				insert( WH, calc_ab, 2 );
+				insert( WH, ES, 8 );
+				insert( WH, HG, 6 );
+				insert( calc_ab, ES, 7 );
+				insert( calc_ab, HG, 14 );
+				insert( HG, ES, 6 );
+				return 0;
+			}( );
+			auto res = conflict_map.find( std::make_pair( std::min( l, r ), std::max( l, r ) ) );
+			assert( res != conflict_map.end( ) );
+			assert( t == 0 );
+			return res->second;
+		}
+		size_t get_conflict( ) const
+		{
+			size_t ret = 0;
+			size_t ii = 0;
+			for ( auto i :  paired_set )
+			{
+				ret += get_conflict( i.first, i.second );
+				if ( ii == psy_position )
+				{
+					ret += get_conflict( psych, i.first );
+					ret += get_conflict( psych, i.second );
+				}
+				++ii;
+			}
+			return ret;
+		}
+		bool operator < ( const class_organization & comp ) const
+		{
+			if ( get_conflict( ) > comp.get_conflict( ) ) { return true; }
+			if ( get_conflict( ) < comp.get_conflict( ) ) { return false; }
+			if ( psy_position < comp.psy_position ) { return true; }
+			if ( psy_position > comp.psy_position ) { return false; }
+			return  paired_set < comp. paired_set;
+		}
+		friend std::ostream & operator << ( std::ostream & os, const class_organization & co )
+		{
+			size_t i = 0;
+			for ( auto & p : co. paired_set )
+			{
+				os << p.first << ' ' << p.second;
+				if ( co.psy_position == i ) { os << ' ' << psych; }
+				os << std::endl;
+				++i;
+			}
+			os << "conflict number: " << co.get_conflict( ) << std::endl;
+			return os;
+		}
+	};
+	void conflict_search( )
+	{
+		auto ret = class_organization::all_class_organization( );
+		for ( auto i : ret ) { std::cout << i << std::endl; }
+	}
 }
 #endif //MISC_HPP
