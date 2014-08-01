@@ -624,6 +624,7 @@ namespace misc
 		auto ret = class_organization::all_class_organization( );
 		for ( auto i : ret ) { std::cout << i << std::endl; }
 	}
+}
 #include <boost/optional/optional.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
@@ -702,6 +703,71 @@ BOOST_AUTO_TEST_CASE( BFS_TEST )
 	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
 }
 
-
+template< typename STATE, typename COST, typename EXPAND, typename RETURN_IF >
+boost::optional< std::pair< std::list< STATE >, COST > > uniform_cost_search( const STATE & inital_state,
+																			  const COST & inital_cost,
+																			  const EXPAND & f1,
+																			  const RETURN_IF & f2 )
+{
+	struct state_tag { };
+	struct cost_tag { };
+	using namespace boost;
+	using namespace multi_index;
+	struct element
+	{
+		STATE state;
+		COST cost;
+		std::list< STATE > history;
+	};
+	multi_index_container
+	<
+		element,
+		indexed_by
+		<
+			ordered_unique< tag< state_tag >, member< element, STATE, & element::state > >,
+			ordered_non_unique< tag< cost_tag >, member< element, COST, & element::cost > >
+		>
+	> container( { { inital_state, inital_cost, { } } } );
+	auto & cost_index = container.get< cost_tag >( );
+	auto & state_index = container.get< state_tag >( );
+	while ( ! container.empty( ) )
+	{
+		auto iterator = cost_index.begin( );
+		const element & current_element = * iterator;
+		if ( f2( current_element.state ) ) { return std::make_pair( current_element.history, current_element.cost ); }
+		f1( current_element.state, boost::make_function_output_iterator( [&]( const std::pair< STATE, COST > & e )
+		{
+			auto it = state_index.find( e.first );
+			COST cost = e.second + current_element.cost;
+			std::list< STATE > history = current_element.history;
+			history.push_back( e.first );
+			if ( it == state_index.end( ) ) { state_index.insert( element( { e.first, cost, std::move( history ) } ) ); }
+			else { state_index.modify( it, [&]( element & ee )
+			{
+				if ( ee.cost > cost )
+				{
+					ee.cost = cost;
+					ee.history = std::move( history );
+				}
+			} ); }
+		} ) );
+		cost_index.erase( iterator );
+	}
+	return boost::optional< std::pair< std::list< STATE >, COST > >( );
+}
+typedef std::pair<std::list<location>,size_t> ignore;
+BOOST_TEST_DONT_PRINT_LOG_VALUE( ignore );
+BOOST_AUTO_TEST_CASE( UCS_TEST )
+{
+	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second; };
+	auto res = uniform_cost_search( Sibiu,
+									static_cast< size_t >( 0 ),
+									[&]( location l, auto it )
+	{
+		auto tem = map( ).equal_range( l );
+		std::copy( boost::make_transform_iterator( tem.first, sf ), boost::make_transform_iterator( tem.second, sf ), it );
+	},
+									[](location l){ return l == Bucharest; } );
+	BOOST_CHECK_EQUAL( res, std::make_pair( std::list< location >( { Rimnicu_Vilcea, Pitesti, Bucharest } ), static_cast< size_t >( 278 ) ) );
 }
 #endif //MISC_HPP
