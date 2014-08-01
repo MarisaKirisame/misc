@@ -624,5 +624,84 @@ namespace misc
 		auto ret = class_organization::all_class_organization( );
 		for ( auto i : ret ) { std::cout << i << std::endl; }
 	}
+#include <boost/optional/optional.hpp>
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/identity.hpp>
+#include <boost/multi_index/member.hpp>
+#include <list>
+#include <set>
+#include <iostream>
+#include <map>
+#include <utility>
+#include <cassert>
+#define BOOST_TEST_MAIN
+#define BOOST_TEST_DYN_LINK
+#include <boost/function_output_iterator.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/test/unit_test.hpp>
+template< typename STATE, typename EXPAND, typename RETURN_IF >
+boost::optional< std::list< STATE > > breadth_first_search( const STATE & inital_state, const EXPAND & f1, const RETURN_IF & f2 )
+{
+	std::list< std::pair< STATE, std::list< STATE > > > in_search( { { inital_state, std::list< STATE >( ) } } );
+	while ( ! in_search.empty( ) )
+	{
+		const auto & current_state = in_search.front( );
+		if ( f2( current_state.first ) ) { return current_state.second; }
+		f1( current_state.first,
+			boost::make_function_output_iterator( [&](const STATE & s)
+		{
+			in_search.push_back( { s,
+								   [&]( )
+								   {
+									   auto ret = current_state.second;
+									   ret.push_back(s);
+									   return ret;
+								   }( )
+								 } );
+		} ) );
+		in_search.pop_front( );
+	}
+	return boost::optional< std::list< STATE > >( );
+}
+enum location { Sibiu, Fagaras, Bucharest, Pitesti, Rimnicu_Vilcea };
+
+const std::multimap< location, std::pair< location, size_t > > map( )
+{
+	static std::multimap< location, std::pair< location, size_t > > ret( []()
+	{
+		std::multimap< location, std::pair< location, size_t > > ret;
+		auto add_edge = [&]( location a, location b, size_t cost )
+		{
+			ret.insert( { a, { b, cost } } );
+			ret.insert( { b, { a, cost } } );
+		};
+		add_edge( Sibiu, Rimnicu_Vilcea, 80 );
+		add_edge( Rimnicu_Vilcea, Pitesti, 97 );
+		add_edge( Pitesti, Bucharest, 101 );
+		add_edge( Bucharest, Fagaras, 211 );
+		add_edge( Fagaras, Sibiu, 99 );
+		return ret;
+	}() );
+	return ret;
+}
+BOOST_TEST_DONT_PRINT_LOG_VALUE( std::list< location > );
+BOOST_AUTO_TEST_CASE( BFS_TEST )
+{
+	auto sf = []( const std::pair< location, std::pair< location, size_t > > & pp ){ return pp.second.first; };
+	auto res = breadth_first_search( Sibiu,
+									 [&](location l, const auto & it)
+	{
+		auto tem = map( ).equal_range( l );
+		std::copy( boost::make_transform_iterator( tem.first, sf ),
+				   boost::make_transform_iterator( tem.second, sf ),
+				   it );
+	},
+		[](location l){ return l == Bucharest; } );
+	BOOST_CHECK_EQUAL( res, std::list< location >( { Fagaras, Bucharest } ) );
+}
+
+
 }
 #endif //MISC_HPP
