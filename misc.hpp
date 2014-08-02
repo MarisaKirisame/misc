@@ -770,4 +770,109 @@ BOOST_AUTO_TEST_CASE( UCS_TEST )
 									[](location l){ return l == Bucharest; } );
 	BOOST_CHECK_EQUAL( res, std::make_pair( std::list< location >( { Rimnicu_Vilcea, Pitesti, Bucharest } ), static_cast< size_t >( 278 ) ) );
 }
+
+struct postive_infinity
+{
+	bool operator == ( const postive_infinity & ) { return true; }
+	template< typename T >
+	bool operator == ( const T & ) const { return false; }
+	template< typename T >
+	bool operator != ( const T & t ) const { return ! ( ( * this ) == t ); }
+	template< typename T >
+	bool operator < ( const T & ) const { return false; }
+	template< typename T >
+	bool operator >= ( const T & ) const { return true; }
+	template< typename T >
+	bool operator <= ( const T & t ) const { return ( * this ) == t; }
+	template< typename T >
+	bool operator > ( const T & t ) const { return ( * this ) != t; }
+	template< typename T >
+	postive_infinity operator + ( const T & ) const { return * this; }
+	template< typename T >
+	postive_infinity operator - ( const T & ) const { return * this; }
+	postive_infinity operator - ( const postive_infinity & ) const = delete;
+	template< typename T >
+	postive_infinity operator * ( const T & t ) const
+	{
+		assert( t > 0 );
+		return * this;
+	}
+	template< typename T >
+	postive_infinity operator / ( const T & t ) const
+	{
+		assert( t > 0 );
+		return * this;
+	}
+	template< typename T >
+	postive_infinity & operator += ( const T & t )
+	{
+		( * this ) = ( * this ) + t;
+		return * this;
+	}
+	template< typename T >
+	postive_infinity & operator -= ( const T & t )
+	{
+		( * this ) = ( * this ) - t;
+		return * this;
+	}
+	template< typename T >
+	postive_infinity & operator *= ( const T & t )
+	{
+		( * this ) = ( * this ) * t;
+		return * this;
+	}
+	template< typename T >
+	postive_infinity & operator /= ( const T & t )
+	{
+		( * this ) = ( * this ) / t;
+		return * this;
+	}
+};
+
+template< typename STATE, typename EXPAND, typename RETURN_IF, typename NUM >
+boost::optional< std::list< STATE > > depth_first_search( const STATE & inital_state,
+														  const EXPAND & f1,
+														  const RETURN_IF & f2,
+														  const NUM & depth = std::numeric_limits< size_t >::max( ) )
+{
+	if ( f2( inital_state ) ) { return { inital_state }; }
+	typedef boost::optional< std::list< STATE > > ret_type;
+	if ( depth < 1 ) { return ret_type( ); }
+	auto new_depth = depth - 1;
+	std::vector< STATE > vec;
+	f1( inital_state, std::back_inserter( vec ) );
+	for ( const STATE & s : vec )
+	{
+		auto res = depth_first_search( s, f1, f2, new_depth );
+		if ( res )
+		{
+			res->push_back( inital_state );
+			return res;
+		}
+	}
+	return ret_type( );
+}
+
+template< typename STATE, typename EXPAND, typename RETURN_IF, typename NUM >
+boost::optional< std::list< STATE > > iterative_deepening_depth_first_search( const STATE & inital_state,
+														  const EXPAND & f1,
+														  const RETURN_IF & f2 )
+{
+	size_t i = 0;
+	while ( true )
+	{
+		auto res = depth_first_search( inital_state, f1, f2, i );
+		++i;
+		if ( res ) { return res; }
+	}
+}
+
+BOOST_AUTO_TEST_CASE( DFS )
+{
+}
+
+BOOST_AUTO_TEST_CASE( IDDFS )
+{
+}
+
 #endif //MISC_HPP
