@@ -1,5 +1,6 @@
 #ifndef CAN_CALL_HPP
 #define CAN_CALL_HPP
+#include <boost/mpl/bool.hpp>
 namespace misc
 {
 	template< typename T, typename ... R >
