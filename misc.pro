@@ -14,6 +14,7 @@ HEADERS += \
     value_less.hpp \
     expansion.hpp \
     can_call.hpp \
-    restriction.hpp
+    restriction.hpp \
+    combinator.hpp
 
 LIBS += -lpthread
