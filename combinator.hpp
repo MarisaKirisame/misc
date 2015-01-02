@@ -10,8 +10,10 @@ namespace misc
     {
         T t;
         template< typename ... ARG >
-        decltype( t( std::declval< fix_struct >( ), std::declval< ARG >( ) ... ) ) operator
-        ( )( const ARG & ... arg ) const
+        auto operator ( )( const ARG & ... arg ) const
+        { return t( * this, arg ... ); }
+        template< typename ... ARG >
+        auto operator ( )( const ARG & ... arg )
         { return t( * this, arg ... ); }
     };
 
@@ -82,8 +84,7 @@ namespace misc
         };
         mutable std::map< std::type_index, std::unique_ptr< type_erasure > > m;
         template< typename ... ARG >
-        decltype( t( std::declval< remember_fix_struct >( ), std::declval< ARG >( ) ... ) ) operator( )
-        ( const ARG & ... arg ) const
+        auto operator( )( const ARG & ... arg ) const
         {
             auto tuple = std::make_tuple( arg ... );
             std::type_index id( typeid( tuple ) );

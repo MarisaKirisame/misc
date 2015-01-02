@@ -15,6 +15,7 @@ HEADERS += \
     expansion.hpp \
     can_call.hpp \
     restriction.hpp \
-    combinator.hpp
+    combinator.hpp \
+    iterator.hpp
 
 LIBS += -lpthread
