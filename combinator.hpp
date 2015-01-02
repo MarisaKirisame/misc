@@ -3,6 +3,7 @@
 #include <map>
 #include <boost/any.hpp>
 #include <typeindex>
+#include <memory>
 namespace misc
 {
     template< typename T >
