@@ -3,6 +3,8 @@
 #include <boost/mpl/bool.hpp>
 namespace misc
 {
+    template< typename T > struct PrintType;
+    template< typename  T > T FakeType( );
     template< typename T, typename ... R >
     struct can_call
     {
@@ -10,7 +12,7 @@ namespace misc
         static constexpr boost::mpl::true_ SFINAE(
                 t,
                 std::remove_reference_t
-                < decltype( std::declval< t >( )( std::declval< R >( )... ) ) > * = nullptr )
+                < decltype( FakeType< t >( )( FakeType< R >( )... ) ) > * = nullptr )
         { return boost::mpl::true_( ); }
         static constexpr boost::mpl::false_ SFINAE( ... ) { return boost::mpl::false_( ); }
         static constexpr bool value = decltype( SFINAE( std::declval< T >( ) ) )::value;
