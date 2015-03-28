@@ -10,12 +10,6 @@ OTHER_FILES += \
     README.md
 
 HEADERS += \
-    misc.hpp \
-    value_less.hpp \
-    expansion.hpp \
-    can_call.hpp \
-    restriction.hpp \
-    combinator.hpp \
-    iterator.hpp
+    misc.hpp
 
 LIBS += -lpthread
